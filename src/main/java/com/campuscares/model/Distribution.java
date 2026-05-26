@@ -28,6 +28,9 @@ public class Distribution {
     @Column(name = "remarks")
     private String remarks;
 
+    @Column(name = "pickup_reference_number", unique = true, nullable = false, length = 50)
+    private String pickupReferenceNumber;
+
     @Column(name = "distributed_at", nullable = false, updatable = false)
     private Instant releasedAt;
 
@@ -91,6 +94,14 @@ public class Distribution {
 
     public void setRemarks(String remarks) {
         this.remarks = remarks;
+    }
+
+    public String getPickupReferenceNumber() {
+        return pickupReferenceNumber;
+    }
+
+    public void setPickupReferenceNumber(String pickupReferenceNumber) {
+        this.pickupReferenceNumber = pickupReferenceNumber;
     }
 
     public Instant getReleasedAt() {

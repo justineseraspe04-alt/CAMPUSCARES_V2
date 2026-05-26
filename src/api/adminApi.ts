@@ -110,6 +110,7 @@ export interface DistributionAdmin {
   itemName: string;
   quantityReleased: number;
   remarks?: string;
+  pickupReferenceNumber: string;
   releasedAt: string;
 }
 

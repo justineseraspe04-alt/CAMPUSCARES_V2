@@ -9,6 +9,7 @@ public class StudentRequestResponse {
     private String reason;
     private String status;
     private String createdAt;
+    private String pickupReferenceNumber;
 
     public StudentRequestResponse() {
     }
@@ -21,7 +22,8 @@ public class StudentRequestResponse {
             String category,
             String reason,
             String status,
-            String createdAt) {
+            String createdAt,
+            String pickupReferenceNumber) {
         this.id = id;
         this.studentName = studentName;
         this.studentEmail = studentEmail;
@@ -30,6 +32,7 @@ public class StudentRequestResponse {
         this.reason = reason;
         this.status = status;
         this.createdAt = createdAt;
+        this.pickupReferenceNumber = pickupReferenceNumber;
     }
 
     public Long getId() {
@@ -94,5 +97,13 @@ public class StudentRequestResponse {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getPickupReferenceNumber() {
+        return pickupReferenceNumber;
+    }
+
+    public void setPickupReferenceNumber(String pickupReferenceNumber) {
+        this.pickupReferenceNumber = pickupReferenceNumber;
     }
 }

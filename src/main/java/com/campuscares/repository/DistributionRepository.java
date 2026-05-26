@@ -3,11 +3,18 @@ package com.campuscares.repository;
 import com.campuscares.model.Distribution;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface DistributionRepository extends JpaRepository<Distribution, Long> {
+    boolean existsByPickupReferenceNumber(String pickupReferenceNumber);
+
+    boolean existsByRequestId(Long requestId);
+
+    Optional<Distribution> findFirstByRequestIdOrderByReleasedAtDesc(Long requestId);
+
     List<Distribution> findAllByOrderByReleasedAtDesc();
 
     List<Distribution> findByRecipientEmailOrderByReleasedAtDesc(String recipientEmail);

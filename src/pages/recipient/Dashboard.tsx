@@ -337,12 +337,14 @@ export function Dashboard() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {recommendations.map((rec) => (
-                  <div key={rec.id} className="p-4 hover:bg-slate-50/50">
+                  <div key={rec.inventoryItemId} className="p-4 hover:bg-slate-50/50">
                     <div className="flex justify-between items-start gap-2 mb-1">
                       <p className="font-medium text-slate-800">{rec.itemName}</p>
-                      <span className="text-xs font-bold text-emerald-600">{rec.matchPercent}%</span>
+                      <span className="text-xs font-bold text-emerald-600">{rec.matchPercentage}%</span>
                     </div>
-                    <p className="text-xs text-slate-500 mb-2">{rec.reason}</p>
+                    <p className="text-xs text-slate-500 mb-2">
+                      {rec.enhancedReason?.trim() || rec.reason}
+                    </p>
                     <button
                       type="button"
                       onClick={() => handleRequestItem(rec)}

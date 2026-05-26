@@ -1,46 +1,49 @@
 package com.campuscares.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class RecommendationResponse {
-    private Long id;
+    private Long inventoryItemId;
     private String itemName;
     private String category;
-    private String itemCondition;
+    private String condition;
     private Integer quantityAvailable;
-    private int matchPercent;
+    private Integer matchPercentage;
     private String reason;
-    private String size;
-    private String subjectOrCourse;
+    private String enhancedReason;
+    private String source;
 
     public RecommendationResponse() {
     }
 
     public RecommendationResponse(
-            Long id,
+            Long inventoryItemId,
             String itemName,
             String category,
-            String itemCondition,
+            String condition,
             Integer quantityAvailable,
-            int matchPercent,
+            Integer matchPercentage,
             String reason,
-            String size,
-            String subjectOrCourse) {
-        this.id = id;
+            String enhancedReason,
+            String source) {
+        this.inventoryItemId = inventoryItemId;
         this.itemName = itemName;
         this.category = category;
-        this.itemCondition = itemCondition;
+        this.condition = condition;
         this.quantityAvailable = quantityAvailable;
-        this.matchPercent = matchPercent;
+        this.matchPercentage = matchPercentage;
         this.reason = reason;
-        this.size = size;
-        this.subjectOrCourse = subjectOrCourse;
+        this.enhancedReason = enhancedReason;
+        this.source = source;
     }
 
-    public Long getId() {
-        return id;
+    @JsonProperty("inventoryItemId")
+    public Long getInventoryItemId() {
+        return inventoryItemId;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setInventoryItemId(Long inventoryItemId) {
+        this.inventoryItemId = inventoryItemId;
     }
 
     public String getItemName() {
@@ -59,12 +62,12 @@ public class RecommendationResponse {
         this.category = category;
     }
 
-    public String getItemCondition() {
-        return itemCondition;
+    public String getCondition() {
+        return condition;
     }
 
-    public void setItemCondition(String itemCondition) {
-        this.itemCondition = itemCondition;
+    public void setCondition(String condition) {
+        this.condition = condition;
     }
 
     public Integer getQuantityAvailable() {
@@ -75,12 +78,12 @@ public class RecommendationResponse {
         this.quantityAvailable = quantityAvailable;
     }
 
-    public int getMatchPercent() {
-        return matchPercent;
+    public Integer getMatchPercentage() {
+        return matchPercentage;
     }
 
-    public void setMatchPercent(int matchPercent) {
-        this.matchPercent = matchPercent;
+    public void setMatchPercentage(Integer matchPercentage) {
+        this.matchPercentage = matchPercentage;
     }
 
     public String getReason() {
@@ -91,19 +94,19 @@ public class RecommendationResponse {
         this.reason = reason;
     }
 
-    public String getSize() {
-        return size;
+    public String getEnhancedReason() {
+        return enhancedReason;
     }
 
-    public void setSize(String size) {
-        this.size = size;
+    public void setEnhancedReason(String enhancedReason) {
+        this.enhancedReason = enhancedReason;
     }
 
-    public String getSubjectOrCourse() {
-        return subjectOrCourse;
+    public String getSource() {
+        return source;
     }
 
-    public void setSubjectOrCourse(String subjectOrCourse) {
-        this.subjectOrCourse = subjectOrCourse;
+    public void setSource(String source) {
+        this.source = source;
     }
 }

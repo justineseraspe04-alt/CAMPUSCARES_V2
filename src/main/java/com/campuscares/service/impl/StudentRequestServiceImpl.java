@@ -19,6 +19,8 @@ import com.campuscares.model.StudentRequest;
 
 import com.campuscares.model.TransactionLog;
 
+import com.campuscares.repository.DistributionRepository;
+
 import com.campuscares.repository.InventoryItemRepository;
 
 import com.campuscares.repository.StudentRequestRepository;
@@ -62,6 +64,8 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
     private final DashboardService dashboardService;
 
+    private final DistributionRepository distributionRepository;
+
 
 
     public StudentRequestServiceImpl(
@@ -74,7 +78,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
             TransactionLogRepository transactionLogRepository,
 
-            DashboardService dashboardService) {
+            DashboardService dashboardService,
+
+            DistributionRepository distributionRepository) {
 
         this.studentRequestRepository = studentRequestRepository;
 
@@ -85,6 +91,8 @@ public class StudentRequestServiceImpl implements StudentRequestService {
         this.transactionLogRepository = transactionLogRepository;
 
         this.dashboardService = dashboardService;
+
+        this.distributionRepository = distributionRepository;
 
     }
 
@@ -305,6 +313,20 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
         String createdAt = entity.getCreatedAt() == null ? "-" : entity.getCreatedAt().toString();
 
+        String pickupReferenceNumber = null;
+
+        if (entity.getStatus() == RequestStatus.RELEASED && entity.getId() != null) {
+
+            pickupReferenceNumber = distributionRepository
+
+                    .findFirstByRequestIdOrderByReleasedAtDesc(entity.getId())
+
+                    .map(distribution -> distribution.getPickupReferenceNumber())
+
+                    .orElse(null);
+
+        }
+
         return new StudentRequestResponse(
 
                 entity.getId(),
@@ -321,7 +343,9 @@ public class StudentRequestServiceImpl implements StudentRequestService {
 
                 entity.getStatus().name(),
 
-                createdAt);
+                createdAt,
+
+                pickupReferenceNumber);
 
     }
 

@@ -8,8 +8,7 @@ import {
   ListIcon,
   BellIcon,
   PaletteIcon,
-  HomeIcon } from
-'lucide-react';
+} from 'lucide-react';
 import { SidebarItem } from './DashboardLayout';
 
 export const adminMenuItems: SidebarItem[] = [
@@ -34,4 +33,4 @@ export const adminMenuItems: SidebarItem[] = [
 { name: 'Transaction Logs', href: '/admin/logs', icon: ListIcon },
 { name: 'Notifications', href: '/admin/notifications', icon: BellIcon },
 { name: 'Design System', href: '/admin/design-system', icon: PaletteIcon },
-{ name: 'Home', href: '/', icon: HomeIcon }];
+];

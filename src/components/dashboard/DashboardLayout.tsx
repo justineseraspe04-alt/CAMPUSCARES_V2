@@ -12,6 +12,7 @@ import {
   CalendarIcon,
 } from 'lucide-react';
 import { accentNavClasses } from '../../utils/tailwindClassMaps';
+import { ConfirmDialog } from '../admin/ConfirmDialog';
 export interface SidebarItem {
   name: string;
   href: string;
@@ -39,11 +40,13 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
 
   const handleLogout = () => {
+    setShowLogoutConfirm(false);
     logout();
     navigate('/login', { replace: true });
   };
@@ -185,7 +188,7 @@ export function DashboardLayout({
         <div className="p-3 sm:p-4 border-t border-slate-100 shrink-0">
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors">
             
             <LogOutIcon className="w-5 h-5 shrink-0" />
@@ -263,6 +266,17 @@ export function DashboardLayout({
           <div className="w-full max-w-7xl mx-auto">{children}</div>
         </div>
       </main>
-    </div>);
 
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Log out?"
+        message="You will be signed out and returned to the login page."
+        confirmLabel="Log out"
+        cancelLabel="Stay signed in"
+        variant="danger"
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+    </div>
+  );
 }

@@ -342,7 +342,8 @@ public class DashboardServiceImpl implements DashboardService {
                 entity.getCategory(),
                 entity.getReason(),
                 entity.getStatus().name(),
-                entity.getCreatedAt() == null ? "-" : entity.getCreatedAt().toString());
+                entity.getCreatedAt() == null ? "-" : entity.getCreatedAt().toString(),
+                null);
     }
 
     private InventoryResponse toInventoryResponse(InventoryItem item) {

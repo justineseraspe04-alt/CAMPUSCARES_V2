@@ -13,6 +13,8 @@ public interface StudentRequestRepository extends JpaRepository<StudentRequest, 
 
     List<StudentRequest> findByStudentEmailOrderByCreatedAtDesc(String studentEmail);
 
+    List<StudentRequest> findByStudentEmailIgnoreCaseOrderByCreatedAtDesc(String studentEmail);
+
     List<StudentRequest> findByStudentEmailAndRequestedItemNameAndStatus(
             String studentEmail,
             String requestedItemName,

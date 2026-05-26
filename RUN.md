@@ -122,6 +122,8 @@ Or PowerShell:
 
 Use the HTTPS forwarding URL ngrok prints (tunnels to Vite; API still goes through the Vite proxy).
 
+**ngrok free tier:** Browser API calls must include the `ngrok-skip-browser-warning` header or ngrok returns **403 Forbidden**. The frontend adds this automatically when you open the app via an `*.ngrok*` URL (`getApiHeaders()` in `src/api/config.ts`). Keep `VITE_API_BASE_URL` empty so `/api` requests stay on the Vite proxy.
+
 ---
 
 ## 3. Quick command cheat sheet

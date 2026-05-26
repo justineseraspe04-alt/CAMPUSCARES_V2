@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, getApiHeaders } from './config';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -44,9 +44,7 @@ export async function apiFetch<T>(
   const { method = 'GET', body, query } = options || {};
   const init: RequestInit = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getApiHeaders(),
     credentials: 'include',
   };
 

@@ -18,8 +18,11 @@ public class RecommendationApiController {
     }
 
     @GetMapping("/student")
-    public ResponseEntity<ApiResponse> recommend(@RequestParam String email) {
-        return ResponseEntity.ok(recommendationService.recommendItemsForStudent(email));
+    public ResponseEntity<ApiResponse> recommend(@RequestParam(required = false) String email) {
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("email query parameter is required"));
+        }
+        return ResponseEntity.ok(recommendationService.getRecommendationsForStudent(email.trim()));
     }
 }
 

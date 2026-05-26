@@ -17,7 +17,11 @@ import {
   NotificationStats,
 } from '../../api/notificationApi';
 import { UserProfile } from '../dashboard/DashboardLayout';
-import { formatNotificationType } from '../../utils/notificationDisplay';
+import {
+  extractPickupReferenceNumber,
+  formatNotificationType,
+} from '../../utils/notificationDisplay';
+import { PickupReferenceBadge } from './PickupReferenceBadge';
 
 const statusStyles: Record<string, { bg: string; text: string }> = {
   sky: { bg: 'bg-sky-50', text: 'text-sky-600' },
@@ -206,7 +210,13 @@ export function NotificationPageContent({ user, accent = 'sky' }: NotificationPa
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {notifications.map((notif) => (
+            {notifications.map((notif) => {
+              const pickupReference =
+                notif.type === 'ITEM_RELEASED'
+                  ? extractPickupReferenceNumber(notif.message)
+                  : null;
+
+              return (
               <div
                 key={notif.id}
                 className={`p-6 flex flex-col sm:flex-row sm:items-start gap-4 transition-colors ${
@@ -231,7 +241,10 @@ export function NotificationPageContent({ user, accent = 'sky' }: NotificationPa
                   {notif.title && notif.message && notif.title !== notif.message && (
                     <p className="text-sm text-slate-600 mb-1">{notif.message}</p>
                   )}
-                  <p className="text-xs font-medium text-slate-400">
+                  {pickupReference && (
+                    <PickupReferenceBadge referenceNumber={pickupReference} accent={accent} />
+                  )}
+                  <p className="text-xs font-medium text-slate-400 mt-2">
                     {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
                   </p>
                 </div>
@@ -252,7 +265,8 @@ export function NotificationPageContent({ user, accent = 'sky' }: NotificationPa
                   </button>
                 )}
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </motion.div>

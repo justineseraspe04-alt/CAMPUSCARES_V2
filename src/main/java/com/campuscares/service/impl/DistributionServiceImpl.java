@@ -21,6 +21,7 @@ import com.campuscares.service.NotificationService;
 import com.campuscares.util.CategoryUtil;
 import com.campuscares.util.NotificationConstants;
 import com.campuscares.util.NotificationTypes;
+import com.campuscares.util.PickupReferenceGenerator;
 import com.campuscares.util.ValidationUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DistributionServiceImpl implements DistributionService {
     private static final String ADMIN_ACTOR = "admin@campuscares.com";
+    private static final int MAX_REFERENCE_ATTEMPTS = 12;
 
     private final InventoryItemRepository inventoryItemRepository;
     private final DistributionRepository distributionRepository;
@@ -107,8 +109,7 @@ public class DistributionServiceImpl implements DistributionService {
                             + ", requested: " + request.getQuantityReleased());
         }
 
-        item.setQuantityAvailable(item.getQuantityAvailable() - request.getQuantityReleased());
-        inventoryItemRepository.save(item);
+        String pickupReferenceNumber = generateUniquePickupReferenceNumber();
 
         Distribution distribution = new Distribution();
         if (linkedRequest != null) {
@@ -119,25 +120,31 @@ public class DistributionServiceImpl implements DistributionService {
         distribution.setItemName(item.getItemName());
         distribution.setQuantityReleased(request.getQuantityReleased());
         distribution.setRemarks(request.getRemarks());
+        distribution.setPickupReferenceNumber(pickupReferenceNumber);
         Distribution savedDistribution = distributionRepository.save(distribution);
+
+        item.setQuantityAvailable(item.getQuantityAvailable() - request.getQuantityReleased());
+        inventoryItemRepository.save(item);
 
         if (linkedRequest != null) {
             linkedRequest.setStatus(RequestStatus.RELEASED);
             studentRequestRepository.save(linkedRequest);
         }
 
+        String releaseDetails = "Released " + item.getItemName() + " to " + recipientName
+                + ". Pickup Reference No: " + pickupReferenceNumber + "."
+                + (linkedRequest != null ? " (request #" + linkedRequest.getId() + ")" : "");
+
         TransactionLog log = new TransactionLog();
         log.setAction("ITEM_RELEASED");
         log.setPerformedBy(ADMIN_ACTOR);
-        log.setDetails("Released " + request.getQuantityReleased() + " " + item.getItemName()
-                + " to " + recipientName
-                + (linkedRequest != null ? " (request #" + linkedRequest.getId() + ")" : ""));
+        log.setDetails(releaseDetails);
         transactionLogRepository.save(log);
 
         notificationService.createNotification(
                 recipientEmail,
                 "Item ready for pickup",
-                "Your item '" + item.getItemName() + "' has been released and is ready for pickup.",
+                buildPickupNotificationMessage(item.getItemName(), pickupReferenceNumber),
                 NotificationTypes.ITEM_RELEASED);
 
         if (item.getQuantityAvailable() <= 5) {
@@ -156,7 +163,26 @@ public class DistributionServiceImpl implements DistributionService {
                     NotificationTypes.ADMIN_LOW_INVENTORY);
         }
 
-        return ApiResponse.ok("Item released successfully.", toResponse(savedDistribution));
+        return ApiResponse.ok(
+                "Item released successfully. Pickup Reference No: " + pickupReferenceNumber,
+                toResponse(savedDistribution));
+    }
+
+    private String generateUniquePickupReferenceNumber() {
+        for (int attempt = 0; attempt < MAX_REFERENCE_ATTEMPTS; attempt++) {
+            String candidate = PickupReferenceGenerator.generatePickupReferenceNumber();
+            if (!distributionRepository.existsByPickupReferenceNumber(candidate)) {
+                return candidate;
+            }
+        }
+        throw new InvalidOperationException("Could not generate a unique pickup reference number.");
+    }
+
+    private String buildPickupNotificationMessage(String itemName, String pickupReferenceNumber) {
+        String safeItemName = itemName == null || itemName.isBlank() ? "your item" : itemName.trim();
+        return "Your item '" + safeItemName + "' has been released and is ready for pickup. "
+                + "Pickup Reference No: " + pickupReferenceNumber
+                + ". Please present this reference number when claiming your item.";
     }
 
     private StudentRequest resolveApprovedRequest(DistributionRequest request) {
@@ -164,6 +190,14 @@ public class DistributionServiceImpl implements DistributionService {
             StudentRequest entity = studentRequestRepository.findById(request.getRequestId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Student request not found: " + request.getRequestId()));
+            if (entity.getStatus() == RequestStatus.RELEASED) {
+                throw new InvalidOperationException(
+                        "This request has already been released and cannot be released again.");
+            }
+            if (distributionRepository.existsByRequestId(entity.getId())) {
+                throw new InvalidOperationException(
+                        "A distribution record already exists for request #" + entity.getId() + ".");
+            }
             if (entity.getStatus() != RequestStatus.APPROVED) {
                 throw new InvalidOperationException(
                         "Only approved requests can be released. Current status: " + entity.getStatus());
@@ -189,7 +223,12 @@ public class DistributionServiceImpl implements DistributionService {
             throw new InvalidOperationException(
                     "Multiple approved requests found. Please release using requestId.");
         }
-        return approved.get(0);
+        StudentRequest entity = approved.get(0);
+        if (distributionRepository.existsByRequestId(entity.getId())) {
+            throw new InvalidOperationException(
+                    "A distribution record already exists for request #" + entity.getId() + ".");
+        }
+        return entity;
     }
 
     private InventoryItem findInventoryForRelease(String itemName, ItemCategory category) {
@@ -222,6 +261,7 @@ public class DistributionServiceImpl implements DistributionService {
                 distribution.getItemName(),
                 distribution.getQuantityReleased(),
                 distribution.getRemarks(),
+                distribution.getPickupReferenceNumber(),
                 distribution.getReleasedAt());
     }
 }

@@ -207,7 +207,14 @@ export function History() {
                       {formatRequestDate(r.createdAt)}
                     </td>
                     <td className="px-6 py-4">
-                      <StatusBadge status={r.status} />
+                      <div className="flex flex-col gap-1">
+                        <StatusBadge status={r.status} />
+                        {r.status === 'RELEASED' && r.pickupReferenceNumber && (
+                          <span className="text-xs font-mono text-indigo-700">
+                            Ref: {r.pickupReferenceNumber}
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

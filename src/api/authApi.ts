@@ -1,5 +1,15 @@
 import { ApiResponse } from './apiClient';
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, getApiHeaders, isNgrokHost } from './config';
+
+function authErrorMessage(status: number, responseData: { message?: string } | null): string {
+  if (status === 403 && isNgrokHost()) {
+    return 'ngrok blocked the request. Restart the frontend after the fix, or open the app via http://localhost:5173.';
+  }
+  if (status === 500) {
+    return 'Server error. Make sure Spring Boot is running at http://localhost:8080.';
+  }
+  return responseData?.message || 'API request failed';
+}
 
 export interface AuthResponseData {
   userId: number;
@@ -28,9 +38,7 @@ export function login(payload: LoginPayload) {
 
   return fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getApiHeaders(),
     credentials: 'include',
     body: JSON.stringify({
       email: payload.email.trim(),
@@ -41,13 +49,7 @@ export function login(payload: LoginPayload) {
     .then(async (response) => {
       const responseData = await response.json().catch(() => null);
       if (!response.ok) {
-        const message =
-          responseData?.message ||
-          (response.status === 500
-            ? 'Server error. Make sure Spring Boot is running at http://localhost:8080.'
-            : response.statusText) ||
-          'API request failed';
-        throw new Error(message);
+        throw new Error(authErrorMessage(response.status, responseData));
       }
       return responseData as ApiResponse<AuthResponseData>;
     })
@@ -69,9 +71,7 @@ export function register(payload: RegisterPayload) {
 
   return fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getApiHeaders(),
     credentials: 'include',
     body: JSON.stringify({
       fullName: payload.fullName.trim(),
@@ -83,13 +83,7 @@ export function register(payload: RegisterPayload) {
     .then(async (response) => {
       const responseData = await response.json().catch(() => null);
       if (!response.ok) {
-        const message =
-          responseData?.message ||
-          (response.status === 500
-            ? 'Server error. Make sure Spring Boot is running at http://localhost:8080.'
-            : response.statusText) ||
-          'API request failed';
-        throw new Error(message);
+        throw new Error(authErrorMessage(response.status, responseData));
       }
       return responseData as ApiResponse<AuthResponseData>;
     })

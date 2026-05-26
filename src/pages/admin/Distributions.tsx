@@ -164,14 +164,19 @@ export function Distributions() {
 
     setSubmitting(true);
     try {
-      await releaseDistribution({
+      const response = await releaseDistribution({
         ...form,
         recipientName: form.recipientName.trim(),
         recipientEmail: form.recipientEmail.trim(),
         itemName: form.itemName.trim(),
         remarks: form.remarks?.trim() || '',
       });
-      setSuccessMessage('Item released successfully.');
+      const pickupRef = response.data?.pickupReferenceNumber;
+      setSuccessMessage(
+        pickupRef
+          ? `Item released successfully. Pickup Reference No: ${pickupRef}`
+          : response.message || 'Item released successfully.'
+      );
       setShowReleaseModal(false);
       setForm(emptyForm);
       await loadData('');
@@ -382,6 +387,11 @@ export function Distributions() {
                         <td className="px-6 py-4">
                           <p className="font-medium text-slate-700">{dist.itemName}</p>
                           <p className="text-xs text-slate-500">Qty: {dist.quantityReleased} • DIST-{dist.id}</p>
+                          {dist.pickupReferenceNumber && (
+                            <p className="text-xs font-mono text-sky-700 mt-1">
+                              Ref: {dist.pickupReferenceNumber}
+                            </p>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-slate-600">
                           {dist.releasedAt ? new Date(dist.releasedAt).toLocaleString() : '-'}

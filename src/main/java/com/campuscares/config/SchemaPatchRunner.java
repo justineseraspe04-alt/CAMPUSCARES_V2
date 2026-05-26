@@ -1,5 +1,7 @@
 package com.campuscares.config;
 
+import com.campuscares.util.PickupReferenceGenerator;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -52,11 +54,46 @@ public class SchemaPatchRunner implements ApplicationRunner {
                     "ALTER TABLE distributions ADD COLUMN IF NOT EXISTS request_id BIGINT");
             jdbcTemplate.execute(
                     "ALTER TABLE distributions ADD COLUMN IF NOT EXISTS distributed_at TIMESTAMPTZ");
+            jdbcTemplate.execute(
+                    "ALTER TABLE distributions ADD COLUMN IF NOT EXISTS pickup_reference_number VARCHAR(50)");
             jdbcTemplate.update(
                     "UPDATE distributions SET distributed_at = NOW() WHERE distributed_at IS NULL");
+            jdbcTemplate.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_distributions_pickup_reference_number "
+                            + "ON distributions(pickup_reference_number) "
+                            + "WHERE pickup_reference_number IS NOT NULL");
+            backfillPickupReferences();
         } catch (Exception ex) {
             log.warn("Distribution schema patch skipped: {}", ex.getMessage());
         }
+    }
+
+    private void backfillPickupReferences() {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM distributions WHERE pickup_reference_number IS NULL "
+                        + "OR TRIM(pickup_reference_number) = ''",
+                Long.class);
+        for (Long id : ids) {
+            String reference = generateUniquePickupReference();
+            jdbcTemplate.update(
+                    "UPDATE distributions SET pickup_reference_number = ? WHERE id = ?",
+                    reference,
+                    id);
+        }
+    }
+
+    private String generateUniquePickupReference() {
+        for (int attempt = 0; attempt < 12; attempt++) {
+            String candidate = PickupReferenceGenerator.generatePickupReferenceNumber();
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM distributions WHERE pickup_reference_number = ?",
+                    Integer.class,
+                    candidate);
+            if (count != null && count == 0) {
+                return candidate;
+            }
+        }
+        return PickupReferenceGenerator.generatePickupReferenceNumber() + "X";
     }
 
     private void patchInventory() {

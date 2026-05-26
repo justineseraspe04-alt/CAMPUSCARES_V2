@@ -10,6 +10,7 @@ export interface StudentRequestRecord {
   reason: string;
   status: string;
   createdAt: string;
+  pickupReferenceNumber?: string;
 }
 
 export interface RecipientDashboardStats {
@@ -24,17 +25,8 @@ export interface RecipientDashboardStats {
 /** @deprecated Use RecipientDashboardStats */
 export type RecipientStats = RecipientDashboardStats;
 
-export interface RecommendationRecord {
-  id: number;
-  itemName: string;
-  category: string;
-  itemCondition: string;
-  quantityAvailable: number;
-  matchPercent: number;
-  reason: string;
-  size?: string;
-  subjectOrCourse?: string;
-}
+export type { RecommendationRecord } from './recommendationApi';
+export { getRecommendationsForStudent as getRecommendations } from './recommendationApi';
 
 export interface RequestPayload {
   studentName: string;
@@ -66,12 +58,6 @@ export function getRecipientDashboardStats(studentEmail: string) {
 
 export function getRecipientStats(studentEmail: string) {
   return getRecipientDashboardStats(studentEmail);
-}
-
-export function getRecommendations(studentEmail: string) {
-  return apiFetch<RecommendationRecord[]>('/recommendations/student', {
-    query: { email: studentEmail },
-  });
 }
 
 export { getAllInventory, searchInventory, getInventoryByCategory };

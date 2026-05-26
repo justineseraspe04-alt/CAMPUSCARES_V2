@@ -10,6 +10,7 @@ public class DistributionResponse {
     private String itemName;
     private Integer quantityReleased;
     private String remarks;
+    private String pickupReferenceNumber;
     private Instant releasedAt;
 
     public DistributionResponse() {
@@ -22,6 +23,7 @@ public class DistributionResponse {
             String itemName,
             Integer quantityReleased,
             String remarks,
+            String pickupReferenceNumber,
             Instant releasedAt) {
         this.id = id;
         this.recipientName = recipientName;
@@ -29,6 +31,7 @@ public class DistributionResponse {
         this.itemName = itemName;
         this.quantityReleased = quantityReleased;
         this.remarks = remarks;
+        this.pickupReferenceNumber = pickupReferenceNumber;
         this.releasedAt = releasedAt;
     }
 
@@ -78,6 +81,14 @@ public class DistributionResponse {
 
     public void setRemarks(String remarks) {
         this.remarks = remarks;
+    }
+
+    public String getPickupReferenceNumber() {
+        return pickupReferenceNumber;
+    }
+
+    public void setPickupReferenceNumber(String pickupReferenceNumber) {
+        this.pickupReferenceNumber = pickupReferenceNumber;
     }
 
     @JsonProperty("releasedAt")

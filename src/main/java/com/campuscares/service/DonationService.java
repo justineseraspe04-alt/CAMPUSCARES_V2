@@ -15,5 +15,7 @@ public interface DonationService {
     ApiResponse getPendingDonations();
 
     ApiResponse getDonationsByDonorEmail(String donorEmail);
+
+    ApiResponse getDonorStats(String donorEmail);
 }
 

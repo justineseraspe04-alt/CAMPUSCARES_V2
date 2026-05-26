@@ -2,22 +2,28 @@
 import { motion } from 'framer-motion';
 import { ListIcon, SearchIcon } from 'lucide-react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import { adminMenuItems, adminUser } from '../../components/dashboard/adminConfig';
+import { useDashboardProfile } from '../../hooks/useDashboardProfile';
+import { useAdminMenuItems } from '../../hooks/useAdminMenuItems';
 import { getLogs, TransactionLogAdmin } from '../../api/adminApi';
 
 export function Logs() {
+  const profile = useDashboardProfile();
+  const menuItems = useAdminMenuItems();
   const [view, setView] = useState<'timeline' | 'table'>('timeline');
   const [logs, setLogs] = useState<TransactionLogAdmin[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const loadLogs = async () => {
+      setLoading(true);
+      setError('');
       try {
         const response = await getLogs();
-        setLogs(response.data);
-      } catch (error) {
-        console.error('Failed to load logs:', error);
+        setLogs(response.data ?? []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load transaction logs.');
       } finally {
         setLoading(false);
       }
@@ -40,8 +46,13 @@ export function Logs() {
   }, [logs, searchTerm]);
 
   return (
-    <DashboardLayout sidebarItems={adminMenuItems} sidebarLabel="Admin Menu" user={adminUser}>
+    <DashboardLayout sidebarItems={menuItems} sidebarLabel="Admin Menu" user={profile}>
       <div className="space-y-8 pb-12">
+        {error && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {error}
+          </div>
+        )}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Transaction Logs</h1>

@@ -26,7 +26,6 @@ public class DonationRequest {
     @Min(1)
     private Integer quantity;
 
-    @NotBlank
     private String description;
 
     private String size;

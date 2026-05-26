@@ -5,6 +5,7 @@ import com.campuscares.dto.response.ApiResponse;
 import com.campuscares.dto.response.DonationResponse;
 import com.campuscares.enums.DonationStatus;
 import com.campuscares.enums.ItemCategory;
+import com.campuscares.exception.InvalidOperationException;
 import com.campuscares.exception.ResourceNotFoundException;
 import com.campuscares.model.Donation;
 import com.campuscares.model.InventoryItem;
@@ -12,16 +13,20 @@ import com.campuscares.model.TransactionLog;
 import com.campuscares.repository.DonationRepository;
 import com.campuscares.repository.InventoryItemRepository;
 import com.campuscares.repository.TransactionLogRepository;
+import com.campuscares.service.DashboardService;
 import com.campuscares.service.DonationService;
 import com.campuscares.service.NotificationService;
 import com.campuscares.util.CategoryUtil;
 import com.campuscares.util.ItemConditionUtil;
 import com.campuscares.util.NotificationConstants;
+import com.campuscares.util.NotificationTypes;
 import com.campuscares.util.QrCodeUtil;
 import com.campuscares.util.ValidationUtils;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +37,7 @@ public class DonationServiceImpl implements DonationService {
     private final TransactionLogRepository transactionLogRepository;
     private final NotificationService notificationService;
     private final QrCodeUtil qrCodeUtil;
+    private final DashboardService dashboardService;
     private static final DateTimeFormatter DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -40,12 +46,14 @@ public class DonationServiceImpl implements DonationService {
             InventoryItemRepository inventoryItemRepository,
             TransactionLogRepository transactionLogRepository,
             NotificationService notificationService,
-            QrCodeUtil qrCodeUtil) {
+            QrCodeUtil qrCodeUtil,
+            DashboardService dashboardService) {
         this.donationRepository = donationRepository;
         this.inventoryItemRepository = inventoryItemRepository;
         this.transactionLogRepository = transactionLogRepository;
         this.notificationService = notificationService;
         this.qrCodeUtil = qrCodeUtil;
+        this.dashboardService = dashboardService;
     }
 
     @Override
@@ -58,7 +66,9 @@ public class DonationServiceImpl implements DonationService {
         donation.setCategory(ValidationUtils.requireNonBlank(request.getCategory(), "category"));
         donation.setItemCondition(ValidationUtils.requireNonBlank(request.getItemCondition(), "itemCondition"));
         donation.setQuantity(request.getQuantity());
-        donation.setDescription(ValidationUtils.requireNonBlank(request.getDescription(), "description"));
+        String description = request.getDescription();
+        donation.setDescription(
+                description == null || description.isBlank() ? "No description provided." : description.trim());
         donation.setSize(request.getSize());
         donation.setSubjectOrCourse(request.getSubjectOrCourse());
         donation.setStatus(DonationStatus.PENDING);
@@ -66,7 +76,14 @@ public class DonationServiceImpl implements DonationService {
         Donation saved = donationRepository.save(donation);
         notificationService.createNotification(
                 NotificationConstants.ADMIN_EMAIL,
-                "New donation submitted by " + saved.getDonorName() + ": " + saved.getItemName());
+                "New donation submitted",
+                "New donation submitted by " + saved.getDonorName() + ": " + saved.getItemName(),
+                NotificationTypes.ADMIN_NEW_DONATION);
+        notificationService.createNotification(
+                saved.getDonorEmail(),
+                "Donation submitted successfully",
+                "Your donation for \"" + saved.getItemName() + "\" was submitted and is pending admin approval.",
+                NotificationTypes.DONATION_SUBMITTED);
         return ApiResponse.ok("Donation submitted and waiting for admin approval.", toResponse(saved));
     }
 
@@ -75,6 +92,11 @@ public class DonationServiceImpl implements DonationService {
     public ApiResponse approveDonation(Long donationId) {
         Donation donation = donationRepository.findById(donationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Donation not found: " + donationId));
+
+        if (donation.getStatus() != DonationStatus.PENDING) {
+            throw new InvalidOperationException(
+                    "Only pending donations can be approved. Current status: " + donation.getStatus());
+        }
 
         donation.setStatus(DonationStatus.APPROVED);
 
@@ -96,10 +118,14 @@ public class DonationServiceImpl implements DonationService {
                     newItem.setSize(donation.getSize());
                     newItem.setSubjectOrCourse(donation.getSubjectOrCourse());
                     newItem.setQuantityAvailable(0);
+                    newItem.setSourceDonationId(donation.getId());
                     newItem.setQrCode(qrCodeUtil.generateQrCodeText());
                     return newItem;
                 });
 
+        if (item.getSourceDonationId() == null) {
+            item.setSourceDonationId(donation.getId());
+        }
         item.setQuantityAvailable(item.getQuantityAvailable() + donation.getQuantity());
         if (item.getQrCode() == null || item.getQrCode().isBlank()) {
             item.setQrCode(qrCodeUtil.generateQrCodeText());
@@ -118,20 +144,38 @@ public class DonationServiceImpl implements DonationService {
 
         notificationService.createNotification(
                 donation.getDonorEmail(),
-                "Your donation '" + donation.getItemName() + "' has been approved and added to inventory.");
+                "Donation approved",
+                "Your donation '" + donation.getItemName() + "' has been approved and added to inventory.",
+                NotificationTypes.DONATION_APPROVED);
 
         return ApiResponse.ok("Donation approved and added to inventory.", toResponse(donation));
     }
 
     @Override
+    @Transactional
     public ApiResponse rejectDonation(Long donationId) {
         Donation donation = donationRepository.findById(donationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Donation not found: " + donationId));
+
+        if (donation.getStatus() != DonationStatus.PENDING) {
+            throw new InvalidOperationException(
+                    "Only pending donations can be rejected. Current status: " + donation.getStatus());
+        }
+
         donation.setStatus(DonationStatus.REJECTED);
         donationRepository.save(donation);
+
+        TransactionLog rejectLog = new TransactionLog();
+        rejectLog.setAction("DONATION_REJECTED");
+        rejectLog.setDetails("Rejected donation #" + donation.getId() + " (\"" + donation.getItemName() + "\").");
+        rejectLog.setPerformedBy("admin@campuscares.com");
+        transactionLogRepository.save(rejectLog);
+
         notificationService.createNotification(
                 donation.getDonorEmail(),
-                "Your donation '" + donation.getItemName() + "' was rejected.");
+                "Donation rejected",
+                "Your donation '" + donation.getItemName() + "' was rejected.",
+                NotificationTypes.DONATION_REJECTED);
         return ApiResponse.ok("Donation rejected.", toResponse(donation));
     }
 
@@ -152,10 +196,15 @@ public class DonationServiceImpl implements DonationService {
     @Override
     public ApiResponse getDonationsByDonorEmail(String donorEmail) {
         String safeEmail = ValidationUtils.requireNonBlank(donorEmail, "donorEmail");
-        List<DonationResponse> data = donationRepository.findByDonorEmail(safeEmail).stream()
+        List<DonationResponse> data = donationRepository.findByDonorEmailOrderByCreatedAtDesc(safeEmail).stream()
                 .map(this::toResponse)
                 .toList();
         return ApiResponse.ok("Donations by donor fetched.", data);
+    }
+
+    @Override
+    public ApiResponse getDonorStats(String donorEmail) {
+        return dashboardService.getDonorDashboardStats(donorEmail);
     }
 
     private DonationResponse toResponse(Donation donation) {

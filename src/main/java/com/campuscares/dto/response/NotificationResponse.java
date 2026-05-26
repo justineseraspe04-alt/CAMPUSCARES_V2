@@ -5,18 +5,29 @@ import java.time.Instant;
 
 public class NotificationResponse {
     private Long id;
-    private String recipientEmail;
+    private String userEmail;
+    private String title;
     private String message;
+    private String type;
     private boolean read;
     private Instant createdAt;
 
     public NotificationResponse() {
     }
 
-    public NotificationResponse(Long id, String recipientEmail, String message, boolean read, Instant createdAt) {
+    public NotificationResponse(
+            Long id,
+            String userEmail,
+            String title,
+            String message,
+            String type,
+            boolean read,
+            Instant createdAt) {
         this.id = id;
-        this.recipientEmail = recipientEmail;
+        this.userEmail = userEmail;
+        this.title = title;
         this.message = message;
+        this.type = type;
         this.read = read;
         this.createdAt = createdAt;
     }
@@ -29,12 +40,26 @@ public class NotificationResponse {
         this.id = id;
     }
 
-    public String getRecipientEmail() {
-        return recipientEmail;
+    public String getUserEmail() {
+        return userEmail;
     }
 
-    public void setRecipientEmail(String recipientEmail) {
-        this.recipientEmail = recipientEmail;
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
+
+    /** Backward compatibility for older clients. */
+    @JsonProperty("recipientEmail")
+    public String getRecipientEmail() {
+        return userEmail;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     public String getMessage() {
@@ -43,6 +68,14 @@ public class NotificationResponse {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
     @JsonProperty("read")

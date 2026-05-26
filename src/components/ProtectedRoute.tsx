@@ -1,6 +1,8 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { getDashboardPath, normalizeRole } from '../utils/authUtils';
+import { AccessDenied } from './AccessDenied';
 
 interface ProtectedRouteProps {
   allowedRoles?: string[];
@@ -8,18 +10,45 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
+  const location = useLocation();
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-600">
+        Loading...
+      </div>
+    );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role.toUpperCase())) {
-    return <Navigate to="/login" replace />;
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = normalizeRole(user.role);
+    const permitted = allowedRoles
+      .map((r) => normalizeRole(r))
+      .filter(Boolean)
+      .includes(userRole);
+
+    if (!permitted) {
+      const prefix = location.pathname.split('/')[1];
+      const rolePrefix =
+        userRole === 'ADMIN'
+          ? 'admin'
+          : userRole === 'DONOR'
+            ? 'donor'
+            : userRole === 'RECIPIENT'
+              ? 'recipient'
+              : '';
+
+      if (rolePrefix && prefix !== rolePrefix) {
+        return <Navigate to={getDashboardPath(user.role)} replace />;
+      }
+
+      return <AccessDenied />;
+    }
   }
 
   return <>{children}</>;

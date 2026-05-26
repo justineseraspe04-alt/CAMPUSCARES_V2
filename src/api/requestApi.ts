@@ -1,22 +1,10 @@
-import { apiFetch } from './apiClient';
+import {
+  getRequestHistory,
+  submitRequest,
+  type RequestPayload,
+  type StudentRequestRecord,
+} from './recipientApi';
 
-export interface StudentRequestPayload {
-  studentName: string;
-  studentEmail: string;
-  requestedItemName: string;
-  category: string;
-  reason: string;
-}
+export type { RequestPayload as StudentRequestPayload, StudentRequestRecord };
 
-export function submitRequest(payload: StudentRequestPayload) {
-  return apiFetch('/requests/submit', {
-    method: 'POST',
-    query: { role: 'RECIPIENT' },
-    body: payload,
-  });
-}
-
-export function getRequestHistory(studentEmail: string) {
-  // prefer path-based endpoint
-  return apiFetch<any[]>(`/requests/student/${encodeURIComponent(studentEmail)}`);
-}
+export { submitRequest, getRequestHistory };

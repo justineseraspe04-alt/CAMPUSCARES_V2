@@ -17,10 +17,10 @@ public class TransactionLog {
     @Column(nullable = false)
     private String details;
 
-    @Column
+    @Column(name = "performed_by")
     private String performedBy;
 
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @PrePersist
@@ -63,4 +63,3 @@ public class TransactionLog {
         return createdAt;
     }
 }
-

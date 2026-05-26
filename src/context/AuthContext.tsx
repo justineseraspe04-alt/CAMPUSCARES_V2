@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as authApi from '../api/authApi';
+import {
+  normalizeAuthUser,
+  normalizeRole,
+  STORAGE_KEY,
+} from '../utils/authUtils';
 
 export interface AuthUser {
   userId: number;
@@ -10,14 +15,34 @@ export interface AuthUser {
 
 interface AuthContextType {
   user: AuthUser | null;
+  role: string | null;
   loading: boolean;
-  login: (payload: authApi.LoginPayload) => Promise<void>;
+  isAuthenticated: boolean;
+  login: (payload: authApi.LoginPayload) => Promise<AuthUser>;
   register: (payload: authApi.RegisterPayload) => Promise<AuthUser>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const STORAGE_KEY = 'campuscares_user';
+
+function userFromAuthResponse(data: {
+  userId: number;
+  fullName: string;
+  email: string;
+  role: string;
+}): AuthUser {
+  const role = normalizeRole(data.role) ?? data.role.toUpperCase();
+  return {
+    userId: data.userId,
+    fullName: data.fullName?.trim() || data.email,
+    email: data.email.trim(),
+    role,
+  };
+}
+
+function persistUser(nextUser: AuthUser) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -27,7 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        setUser(JSON.parse(stored));
+        const parsed = normalizeAuthUser(JSON.parse(stored));
+        if (parsed) {
+          setUser(parsed);
+          persistUser(parsed);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
       }
@@ -40,15 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!response.success) {
       throw new Error(response.message || 'Login failed');
     }
-    const authData = response.data;
-    const nextUser: AuthUser = {
-      userId: authData.userId,
-      fullName: authData.fullName,
-      email: authData.email,
-      role: authData.role,
-    };
+    const nextUser = userFromAuthResponse(response.data);
     setUser(nextUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
+    persistUser(nextUser);
+    return nextUser;
   };
 
   const register = async (payload: authApi.RegisterPayload) => {
@@ -56,15 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!response.success) {
       throw new Error(response.message || 'Registration failed');
     }
-    const authData = response.data;
-    const nextUser: AuthUser = {
-      userId: authData.userId,
-      fullName: authData.fullName,
-      email: authData.email,
-      role: authData.role,
-    };
+    const nextUser = userFromAuthResponse(response.data);
     setUser(nextUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
+    persistUser(nextUser);
     return nextUser;
   };
 
@@ -73,9 +93,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  const role = user?.role ?? null;
+  const isAuthenticated = user !== null;
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout }),
-    [user, loading]
+    () => ({
+      user,
+      role,
+      loading,
+      isAuthenticated,
+      login,
+      register,
+      logout,
+    }),
+    [user, role, loading, isAuthenticated]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

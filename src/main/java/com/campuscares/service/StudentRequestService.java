@@ -15,5 +15,7 @@ public interface StudentRequestService {
     ApiResponse getAllRequests();
 
     ApiResponse getRequestsByStudentEmail(String studentEmail);
+
+    ApiResponse getRecipientStats(String studentEmail);
 }
 

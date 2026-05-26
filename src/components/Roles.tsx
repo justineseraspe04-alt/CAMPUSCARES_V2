@@ -15,7 +15,7 @@ const roles = [
   description: 'Campus staff managing the platform operations end-to-end.',
   color: 'sky',
   cta: 'Admin Login',
-  ctaLink: '/login',
+  ctaLink: '/login?role=admin',
   capabilities: [
   'Approves incoming donations',
   'Manages inventory catalog',

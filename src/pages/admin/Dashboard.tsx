@@ -9,7 +9,6 @@ import {
   UsersIcon,
   AlertTriangleIcon,
   BellIcon,
-  FilterIcon,
   QrCodeIcon,
   ArrowRightIcon
 } from 'lucide-react';
@@ -22,41 +21,30 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
+import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import { adminMenuItems, adminUser } from '../../components/dashboard/adminConfig';
+import { useDashboardProfile } from '../../hooks/useDashboardProfile';
+import { useAdminMenuItems } from '../../hooks/useAdminMenuItems';
+import { useAdminActions } from '../../hooks/useAdminActions';
+import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import {
-  DashboardStats,
+  AdminDashboardStats,
   DonationAdmin,
   InventoryAdmin,
   StudentRequestAdmin,
-  NotificationAdmin,
-  getDashboardStats,
-  getPendingDonations,
-  getInventory,
-  getPendingRequests,
-  getNotifications,
+  getAdminDashboardStats,
   approveDonation,
   approveRequest,
   rejectDonation,
   rejectRequest
 } from '../../api/adminApi';
 
-const chartData = [
-  { name: 'Mon', donations: 45 },
-  { name: 'Tue', donations: 52 },
-  { name: 'Wed', donations: 38 },
-  { name: 'Thu', donations: 65 },
-  { name: 'Fri', donations: 48 },
-  { name: 'Sat', donations: 25 },
-  { name: 'Sun', donations: 30 }
-];
-
-const categoryProgress = [
-  { name: 'Clothing', value: 45, color: 'bg-sky-500' },
-  { name: 'Books', value: 30, color: 'bg-emerald-500' },
-  { name: 'School Supplies', value: 15, color: 'bg-amber-500' },
-  { name: 'Essentials', value: 8, color: 'bg-rose-500' },
-  { name: 'Others', value: 2, color: 'bg-slate-400' }
+const CATEGORY_BAR_COLORS = [
+  'bg-sky-500',
+  'bg-emerald-500',
+  'bg-amber-500',
+  'bg-rose-500',
+  'bg-slate-400',
 ];
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -74,158 +62,96 @@ const StatusBadge = ({ status }: { status: string }) => {
   );
 };
 
+type DonationConfirm = { type: 'approve' | 'reject'; id: number; itemName: string } | null;
+type RequestConfirm = { type: 'approve' | 'reject'; id: number; itemName: string; studentName: string } | null;
+
 export function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [pendingDonations, setPendingDonations] = useState<DonationAdmin[]>([]);
-  const [inventory, setInventory] = useState<InventoryAdmin[]>([]);
-  const [pendingRequests, setPendingRequests] = useState<StudentRequestAdmin[]>([]);
-  const [notifications, setNotifications] = useState<NotificationAdmin[]>([]);
+  const profile = useDashboardProfile();
+  const menuItems = useAdminMenuItems();
+  const { isBusy, error: actionError, success: actionSuccess, runAction, clearMessages } = useAdminActions();
+  const [donationConfirm, setDonationConfirm] = useState<DonationConfirm>(null);
+  const [requestConfirm, setRequestConfirm] = useState<RequestConfirm>(null);
+  const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    const loadDashboard = async () => {
-      setLoading(true);
-      try {
-        const [statsResp, donationsResp, inventoryResp, requestsResp, notificationsResp] = await Promise.all([
-          getDashboardStats(),
-          getPendingDonations(),
-          getInventory(),
-          getPendingRequests(),
-          getNotifications(adminUser.email)
-        ]);
-
-        setStats(statsResp.data);
-        setPendingDonations(donationsResp.data);
-        setInventory(inventoryResp.data);
-        setPendingRequests(requestsResp.data);
-        setNotifications(notificationsResp.data);
-      } catch (err) {
-        console.error(err);
-        setError(err instanceof Error ? err.message : 'Unable to load admin dashboard.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDashboard();
+  const loadDashboard = React.useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const statsResp = await getAdminDashboardStats();
+      setStats(statsResp.data ?? null);
+    } catch (err) {
+      setStats(null);
+      setError(err instanceof Error ? err.message : 'Unable to load admin dashboard.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const lowStockCount = inventory.filter((item) => item.quantityAvailable <= 5).length;
-  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
-  const totalDistributedItems = stats?.totalDistributedItems ?? 0;
-  const beneficiariesHelped = stats?.beneficiaries ?? 0;
-  const totalDonations = stats?.totalDonations ?? 0;
-  const approvedDonations = Math.max(0, totalDonations - pendingDonations.length);
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const pendingDonations = stats?.pendingDonationItems ?? [];
+  const pendingRequests = stats?.pendingRequestItems ?? [];
+  const inventory = stats?.inventoryPreview ?? [];
+  const chartData = stats?.donationActivityByDay ?? [];
+  const requestCategories = stats?.requestCategoryBreakdown ?? [];
+  const donationCategories = stats?.donationCategoryBreakdown ?? [];
+  const recentLogs = stats?.recentLogs ?? [];
+  const recentNotifications = stats?.recentNotifications ?? [];
 
   const kpiData = useMemo(
     () => [
-      {
-        title: 'Total Donations',
-        value: totalDonations.toString(),
-        icon: PackageIcon,
-        color: 'sky',
-        trend: '+12.5%',
-        trendUp: true
-      },
-      {
-        title: 'Pending Donations',
-        value: pendingDonations.length.toString(),
-        icon: ClockIcon,
-        color: 'amber',
-        trend: '+3',
-        trendUp: true
-      },
-      {
-        title: 'Approved Donations',
-        value: approvedDonations.toString(),
-        icon: CheckCircle2Icon,
-        color: 'emerald',
-        trend: '+8.2%',
-        trendUp: true
-      },
-      {
-        title: 'Total Inventory Items',
-        value: inventory.length.toString(),
-        icon: BoxesIcon,
-        color: 'indigo',
-        trend: '+45',
-        trendUp: true
-      },
-      {
-        title: 'Distributed Items',
-        value: totalDistributedItems.toString(),
-        icon: HandHeartIcon,
-        color: 'cyan',
-        trend: '+14.3%',
-        trendUp: true
-      },
-      {
-        title: 'Beneficiaries Helped',
-        value: beneficiariesHelped.toString(),
-        icon: UsersIcon,
-        color: 'teal',
-        trend: '+22',
-        trendUp: true
-      },
-      {
-        title: 'Low Inventory Alerts',
-        value: lowStockCount.toString(),
-        icon: AlertTriangleIcon,
-        color: 'rose',
-        trend: '-2',
-        trendUp: false
-      },
-      {
-        title: 'Unread Notifications',
-        value: unreadNotifications.toString(),
-        icon: BellIcon,
-        color: 'violet',
-        trend: '+5',
-        trendUp: true
-      }
+      { title: 'Total Donations', value: String(stats?.totalDonations ?? 0), icon: PackageIcon, color: 'sky' },
+      { title: 'Pending Donations', value: String(stats?.pendingDonations ?? 0), icon: ClockIcon, color: 'amber' },
+      { title: 'Approved Donations', value: String(stats?.approvedDonations ?? 0), icon: CheckCircle2Icon, color: 'emerald' },
+      { title: 'Total Inventory Items', value: String(stats?.totalInventoryItems ?? 0), icon: BoxesIcon, color: 'indigo' },
+      { title: 'Distributed Items', value: String(stats?.totalDistributedItems ?? 0), icon: HandHeartIcon, color: 'cyan' },
+      { title: 'Beneficiaries Helped', value: String(stats?.beneficiariesHelped ?? 0), icon: UsersIcon, color: 'teal' },
+      { title: 'Low Inventory Alerts', value: String(stats?.lowStockItems ?? 0), icon: AlertTriangleIcon, color: 'rose' },
+      { title: 'Unread Notifications', value: String(stats?.unreadNotifications ?? 0), icon: BellIcon, color: 'violet' },
     ],
-    [approvedDonations, inventory.length, lowStockCount, pendingDonations.length, totalDistributedItems, totalDonations, unreadNotifications, beneficiariesHelped]
+    [stats]
   );
 
-  const handleApproveDonation = async (id: number) => {
-    try {
-      await approveDonation(id);
-      setPendingDonations((prev) => prev.filter((donation) => donation.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+  const distributionProgress = stats?.distributionProgressPercent ?? 0;
+  const releasedRequests = stats?.releasedRequests ?? 0;
+  const approvedRequests = stats?.approvedRequests ?? 0;
+
+  const handleDonationConfirm = async () => {
+    if (!donationConfirm) return;
+    const { type, id } = donationConfirm;
+    const ok = await runAction(
+      `${type}-donation-${id}`,
+      async () => {
+        if (type === 'approve') await approveDonation(id);
+        else await rejectDonation(id);
+        await loadDashboard();
+      },
+      type === 'approve' ? 'Donation approved.' : 'Donation rejected.'
+    );
+    if (ok) setDonationConfirm(null);
   };
 
-  const handleRejectDonation = async (id: number) => {
-    try {
-      await rejectDonation(id);
-      setPendingDonations((prev) => prev.filter((donation) => donation.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleApproveRequest = async (id: number) => {
-    try {
-      await approveRequest(id);
-      setPendingRequests((prev) => prev.filter((request) => request.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleRejectRequest = async (id: number) => {
-    try {
-      await rejectRequest(id);
-      setPendingRequests((prev) => prev.filter((request) => request.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+  const handleRequestConfirm = async () => {
+    if (!requestConfirm) return;
+    const { type, id } = requestConfirm;
+    const ok = await runAction(
+      `${type}-request-${id}`,
+      async () => {
+        if (type === 'approve') await approveRequest(id);
+        else await rejectRequest(id);
+        await loadDashboard();
+      },
+      type === 'approve' ? 'Request approved.' : 'Request rejected.'
+    );
+    if (ok) setRequestConfirm(null);
   };
 
   return (
-    <DashboardLayout sidebarItems={adminMenuItems} sidebarLabel="Admin Menu" user={adminUser}>
+    <DashboardLayout sidebarItems={menuItems} sidebarLabel="Admin Menu" user={profile}>
       <div className="space-y-8 pb-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -240,25 +166,50 @@ export function Dashboard() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
               System Online
             </div>
-            <h1 className="text-3xl lg:text-4xl font-bold mb-3 tracking-tight">Welcome back, Admin</h1>
+            <h1 className="text-3xl lg:text-4xl font-bold mb-3 tracking-tight">
+              Welcome back, {profile.name.split(' ')[0] || 'Admin'}
+            </h1>
             <p className="text-slate-300 max-w-2xl text-base lg:text-lg">
               Monitor donations, manage inventory, approve student requests, and track the impact of CampusCares — all from one centralized dashboard.
             </p>
           </div>
 
           <div className="relative z-10 flex lg:flex-col gap-3">
-            <button className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-sky-500 text-white font-medium hover:bg-sky-400 transition-colors shadow-lg shadow-sky-500/30">
+            <Link
+              to="/admin/donations/pending"
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-sky-500 text-white font-medium hover:bg-sky-400 transition-colors shadow-lg shadow-sky-500/30"
+            >
               Review Pending
               <ArrowRightIcon className="w-4 h-4" />
-            </button>
-            <button className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-medium hover:bg-white/20 transition-colors backdrop-blur-sm">
+            </Link>
+            <Link
+              to="/admin/logs"
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-medium hover:bg-white/20 transition-colors backdrop-blur-sm"
+            >
               View Reports
-            </button>
+            </Link>
           </div>
         </motion.div>
 
-        {error && (
-          <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-700">{error}</div>
+        {(error || actionError) && (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-700">
+            {error || actionError}
+            {actionError && (
+              <button type="button" onClick={clearMessages} className="ml-2 underline text-sm">
+                Dismiss
+              </button>
+            )}
+          </div>
+        )}
+
+        {actionSuccess && (
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-700">
+            {actionSuccess}
+          </div>
+        )}
+
+        {loading && (
+          <p className="text-sm text-slate-500">Refreshing dashboard data...</p>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -276,11 +227,10 @@ export function Dashboard() {
                   <div className={`w-10 h-10 rounded-xl bg-${kpi.color}-50 flex items-center justify-center text-${kpi.color}-600`}>
                     <kpi.icon className="w-5 h-5" />
                   </div>
-                  <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${kpi.trendUp ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                    {kpi.trendUp ? '↑' : '↓'} {kpi.trend}
-                  </span>
                 </div>
-                <h3 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">{kpi.value}</h3>
+                <h3 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">
+                  {loading ? '…' : kpi.value}
+                </h3>
                 <p className="text-sm font-medium text-slate-500">{kpi.title}</p>
               </div>
             </motion.div>
@@ -295,28 +245,42 @@ export function Dashboard() {
             className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm"
           >
             <h2 className="text-lg font-bold text-slate-800 mb-1">Distribution Progress</h2>
-            <p className="text-xs text-slate-500 mb-6">Items released this quarter</p>
+            <p className="text-xs text-slate-500 mb-6">Approved requests released to students</p>
             <div className="flex items-center gap-6">
               <div className="relative w-28 h-28 shrink-0">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="10" />
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#0ea5e9" strokeWidth="10" strokeDasharray="264" strokeDashoffset="79" strokeLinecap="round" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    fill="none"
+                    stroke="#0ea5e9"
+                    strokeWidth="10"
+                    strokeDasharray="264"
+                    strokeDashoffset={264 - (264 * distributionProgress) / 100}
+                    strokeLinecap="round"
+                  />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold text-slate-800">70%</span>
-                  <span className="text-xs text-slate-500">complete</span>
+                  <span className="text-2xl font-bold text-slate-800">
+                    {loading ? '…' : `${distributionProgress}%`}
+                  </span>
+                  <span className="text-xs text-slate-500">released</span>
                 </div>
               </div>
               <div className="flex-1 space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-sky-500"></span> Released</span>
-                  <span className="font-bold text-slate-700">{totalDistributedItems}</span>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-sky-500"></span> Released requests</span>
+                  <span className="font-bold text-slate-700">{loading ? '…' : releasedRequests}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-slate-200"></span> Remaining</span>
-                  <span className="font-bold text-slate-700">{Math.max(0, totalDistributedItems - 675)}</span>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-slate-200"></span> Awaiting release</span>
+                  <span className="font-bold text-slate-700">{loading ? '…' : approvedRequests}</span>
                 </div>
-                <div className="pt-2 border-t border-slate-100 text-xs text-emerald-600 font-medium">↑ 14% vs last quarter</div>
+                <div className="pt-2 border-t border-slate-100 text-xs text-slate-500">
+                  {loading ? 'Loading…' : `${stats?.totalDistributedItems ?? 0} items distributed total`}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -335,20 +299,30 @@ export function Dashboard() {
               <span className="text-xs font-medium px-2 py-1 bg-sky-50 text-sky-600 rounded-full">Last 30 days</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-              {categoryProgress.map((cat, i) => (
-                <div key={cat.name} className="flex items-center gap-4">
-                  <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium text-slate-700 truncate">{cat.name}</span>
-                      <span className="font-bold text-slate-800 ml-2">{cat.value}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div className={`${cat.color} h-1.5 rounded-full`} style={{ width: `${cat.value}%` }} />
+              {loading && <p className="text-sm text-slate-500 col-span-2">Loading categories...</p>}
+              {!loading && requestCategories.length === 0 && (
+                <p className="text-sm text-slate-500 col-span-2">No student requests yet.</p>
+              )}
+              {!loading &&
+                requestCategories.map((cat, i) => (
+                  <div key={cat.name} className="flex items-center gap-4">
+                    <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-slate-700 truncate">{cat.name}</span>
+                        <span className="font-bold text-slate-800 ml-2">{cat.count}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div
+                          className={`${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]} h-1.5 rounded-full`}
+                          style={{ width: `${cat.percent}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </motion.div>
         </div>
@@ -362,11 +336,16 @@ export function Dashboard() {
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-slate-800">Donation Activity</h2>
-              <button className="text-sm font-medium text-sky-600 hover:text-sky-700 flex items-center gap-1">
+              <Link to="/admin/donations" className="text-sm font-medium text-sky-600 hover:text-sky-700 flex items-center gap-1">
                 View Report <ArrowRightIcon className="w-4 h-4" />
-              </button>
+              </Link>
             </div>
             <div className="h-64 mb-8">
+              {loading ? (
+                <p className="h-full flex items-center justify-center text-slate-500 text-sm">Loading chart...</p>
+              ) : chartData.every((d) => d.donations === 0) ? (
+                <p className="h-full flex items-center justify-center text-slate-500 text-sm">No donations in the last 7 days.</p>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -376,18 +355,25 @@ export function Dashboard() {
                   <Bar dataKey="donations" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={40} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-700 mb-4">Donations by Category</h3>
               <div className="space-y-4">
-                {categoryProgress.map((cat) => (
+                {donationCategories.length === 0 && !loading && (
+                  <p className="text-sm text-slate-500">No donations recorded yet.</p>
+                )}
+                {donationCategories.map((cat, i) => (
                   <div key={cat.name}>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="font-medium text-slate-600">{cat.name}</span>
-                      <span className="text-slate-500">{cat.value}%</span>
+                      <span className="text-slate-500">{cat.count}</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2">
-                      <div className={`${cat.color} h-2 rounded-full`} style={{ width: `${cat.value}%` }} />
+                      <div
+                        className={`${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]} h-2 rounded-full`}
+                        style={{ width: `${cat.percent}%` }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -401,29 +387,29 @@ export function Dashboard() {
               transition={{ delay: 0.3 }}
               className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm"
             >
-              <h2 className="text-xl font-bold text-slate-800 mb-6">Recent Activity</h2>
-              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-                {pendingDonations.slice(0, 5).map((item) => {
-                  const colors = {
-                    success: 'bg-emerald-500 ring-emerald-100',
-                    info: 'bg-sky-500 ring-sky-100',
-                    warning: 'bg-amber-500 ring-amber-100',
-                    error: 'bg-rose-500 ring-rose-100'
-                  };
-                  const status = item.status === 'PENDING' ? 'warning' : item.status === 'APPROVED' ? 'success' : 'info';
-                  return (
-                    <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                      <div className={`flex items-center justify-center w-5 h-5 rounded-full border-2 border-white ${colors[status as keyof typeof colors]} ring-4 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10`} />
-                      <div className="w-[calc(100%-2rem)] md:w-[calc(50%-1.5rem)] p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-slate-800 text-sm">Pending donation review</span>
-                          <span className="text-xs font-medium text-slate-400">{item.dateSubmitted || 'Pending'}</span>
-                        </div>
-                        <p className="text-xs text-slate-600">{item.itemName} from {item.donorName}</p>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-slate-800">Recent Logs</h2>
+                <Link to="/admin/logs" className="text-sm font-medium text-sky-600 hover:text-sky-700">
+                  View all
+                </Link>
+              </div>
+              <div className="space-y-4">
+                {loading && <p className="text-sm text-slate-500">Loading logs...</p>}
+                {!loading && recentLogs.length === 0 && (
+                  <p className="text-sm text-slate-500">No transaction logs yet.</p>
+                )}
+                {!loading &&
+                  recentLogs.map((log) => (
+                    <div key={log.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <span className="font-bold text-slate-800 text-sm">{log.action}</span>
+                        <span className="text-xs text-slate-400 shrink-0">
+                          {log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}
+                        </span>
                       </div>
+                      <p className="text-xs text-slate-600 line-clamp-2">{log.details}</p>
                     </div>
-                  );
-                })}
+                  ))}
               </div>
             </motion.div>
             <motion.div
@@ -434,19 +420,33 @@ export function Dashboard() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">Notifications</h2>
-                <span className="bg-rose-100 text-rose-600 text-xs font-bold px-2 py-1 rounded-full">{unreadNotifications} New</span>
+                <span className="bg-rose-100 text-rose-600 text-xs font-bold px-2 py-1 rounded-full">
+                  {loading ? '…' : stats?.unreadNotifications ?? 0} New
+                </span>
               </div>
               <div className="space-y-3">
-                {notifications.slice(0, 2).map((notification) => {
-                  const isAlert = notification.message.toLowerCase().includes('low inventory');
+                {loading && <p className="text-sm text-slate-500">Loading notifications...</p>}
+                {!loading && recentNotifications.length === 0 && (
+                  <p className="text-sm text-slate-500">No notifications yet.</p>
+                )}
+                {!loading &&
+                  recentNotifications.slice(0, 2).map((notification) => {
+                  const isAlert =
+                    notification.type === 'ADMIN_LOW_INVENTORY' ||
+                    notification.message?.toLowerCase().includes('low inventory');
                   return (
                     <div key={notification.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isAlert ? 'bg-rose-50 text-rose-500' : 'bg-sky-50 text-sky-600'}`}>
                         <BellIcon className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-800">{notification.message}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{new Date(notification.createdAt).toLocaleString()}</p>
+                        <p className="text-sm font-bold text-slate-800">{notification.title || notification.message}</p>
+                        {notification.message && notification.title !== notification.message && (
+                          <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">{notification.message}</p>
+                        )}
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : ''}
+                        </p>
                       </div>
                     </div>
                   );
@@ -467,9 +467,6 @@ export function Dashboard() {
               <h2 className="text-xl font-bold text-slate-800">Pending Approvals</h2>
               <p className="text-sm text-slate-500">Review and approve submitted donations.</p>
             </div>
-            <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-              <FilterIcon className="w-4 h-4" /> Filter
-            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -484,11 +481,16 @@ export function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pendingDonations.length === 0 ? (
+                {loading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Loading pending donations...</td>
+                  </tr>
+                )}
+                {!loading && pendingDonations.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-slate-500">No pending donations found.</td>
                   </tr>
-                ) : (
+                ) : !loading && (
                   pendingDonations.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4">
@@ -504,8 +506,34 @@ export function Dashboard() {
                       <td className="px-6 py-4 text-slate-600">{item.dateSubmitted || 'Pending'}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => handleApproveDonation(item.id)} className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 font-medium hover:bg-emerald-100 transition-colors">Approve</button>
-                          <button onClick={() => handleRejectDonation(item.id)} className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 font-medium hover:bg-rose-100 transition-colors">Reject</button>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() =>
+                              setDonationConfirm({
+                                type: 'approve',
+                                id: item.id,
+                                itemName: item.itemName,
+                              })
+                            }
+                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() =>
+                              setDonationConfirm({
+                                type: 'reject',
+                                id: item.id,
+                                itemName: item.itemName,
+                              })
+                            }
+                            className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 font-medium hover:bg-rose-100 transition-colors disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -525,10 +553,17 @@ export function Dashboard() {
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-slate-800">Inventory Overview</h2>
-              <button className="text-sm font-medium text-sky-600 hover:text-sky-700">View All</button>
+              <Link to="/admin/inventory" className="text-sm font-medium text-sky-600 hover:text-sky-700">
+                View All
+              </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {inventory.slice(0, 4).map((item) => (
+              {loading && <p className="text-slate-500 text-sm col-span-2">Loading inventory...</p>}
+              {!loading && inventory.length === 0 && (
+                <p className="text-slate-500 text-sm col-span-2">No inventory items yet.</p>
+              )}
+              {!loading &&
+              inventory.map((item) => (
                 <div key={item.id} className="p-4 rounded-2xl border border-slate-200 hover:border-sky-300 transition-colors relative group">
                   {item.quantityAvailable <= 5 && (
                     <span className="absolute top-3 right-3 flex h-3 w-3">
@@ -568,7 +603,9 @@ export function Dashboard() {
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-slate-800">Student Requests</h2>
-              <button className="text-sm font-medium text-sky-600 hover:text-sky-700">View All</button>
+              <Link to="/admin/requests" className="text-sm font-medium text-sky-600 hover:text-sky-700">
+                View All
+              </Link>
             </div>
             <div className="space-y-4">
               {pendingRequests.length === 0 ? (
@@ -588,10 +625,34 @@ export function Dashboard() {
                     <p className="text-sm text-slate-600 mb-4 bg-white p-3 rounded-xl border border-slate-100 italic">"{req.reason}"</p>
                     {req.status === 'PENDING' && (
                       <div className="flex items-center gap-2">
-                        <button onClick={() => handleApproveRequest(req.id)} className="flex-1 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition-colors">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() =>
+                            setRequestConfirm({
+                              type: 'approve',
+                              id: req.id,
+                              itemName: req.requestedItemName,
+                              studentName: req.studentName,
+                            })
+                          }
+                          className="flex-1 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition-colors disabled:opacity-50"
+                        >
                           Approve
                         </button>
-                        <button onClick={() => handleRejectRequest(req.id)} className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() =>
+                            setRequestConfirm({
+                              type: 'reject',
+                              id: req.id,
+                              itemName: req.requestedItemName,
+                              studentName: req.studentName,
+                            })
+                          }
+                          className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+                        >
                           Deny
                         </button>
                       </div>
@@ -603,6 +664,36 @@ export function Dashboard() {
           </motion.div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={donationConfirm !== null}
+        title={donationConfirm?.type === 'approve' ? 'Approve donation?' : 'Reject donation?'}
+        message={
+          donationConfirm
+            ? `${donationConfirm.type === 'approve' ? 'Approve' : 'Reject'} "${donationConfirm.itemName}"?`
+            : ''
+        }
+        confirmLabel={donationConfirm?.type === 'approve' ? 'Approve' : 'Reject'}
+        variant={donationConfirm?.type === 'reject' ? 'danger' : 'primary'}
+        loading={isBusy}
+        onCancel={() => !isBusy && setDonationConfirm(null)}
+        onConfirm={handleDonationConfirm}
+      />
+
+      <ConfirmDialog
+        open={requestConfirm !== null}
+        title={requestConfirm?.type === 'approve' ? 'Approve request?' : 'Reject request?'}
+        message={
+          requestConfirm
+            ? `${requestConfirm.type === 'approve' ? 'Approve' : 'Reject'} ${requestConfirm.studentName}'s request for "${requestConfirm.itemName}"?`
+            : ''
+        }
+        confirmLabel={requestConfirm?.type === 'approve' ? 'Approve' : 'Reject'}
+        variant={requestConfirm?.type === 'reject' ? 'danger' : 'primary'}
+        loading={isBusy}
+        onCancel={() => !isBusy && setRequestConfirm(null)}
+        onConfirm={handleRequestConfirm}
+      />
     </DashboardLayout>
   );
 }

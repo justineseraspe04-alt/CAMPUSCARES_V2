@@ -1,6 +1,6 @@
 package com.campuscares.api;
 
-import com.campuscares.dto.request.CreateNotificationRequest;
+import com.campuscares.dto.request.NotificationRequest;
 import com.campuscares.dto.response.ApiResponse;
 import com.campuscares.service.NotificationService;
 import jakarta.validation.Valid;
@@ -16,10 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/notifications")
-public class NotificationApiController {
+public class NotificationController {
     private final NotificationService notificationService;
 
-    public NotificationApiController(NotificationService notificationService) {
+    public NotificationController(NotificationService notificationService) {
         this.notificationService = notificationService;
     }
 
@@ -39,8 +39,8 @@ public class NotificationApiController {
     }
 
     @PutMapping("/read/{id}")
-    public ResponseEntity<ApiResponse> markRead(@PathVariable Long id) {
-        return ResponseEntity.ok(notificationService.markNotificationAsRead(id));
+    public ResponseEntity<ApiResponse> markRead(@PathVariable Long id, @RequestParam String email) {
+        return ResponseEntity.ok(notificationService.markNotificationAsRead(id, email));
     }
 
     @PutMapping("/read-all")
@@ -49,8 +49,7 @@ public class NotificationApiController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<ApiResponse> create(@Valid @RequestBody CreateNotificationRequest request) {
-        return ResponseEntity.ok(
-                notificationService.createNotification(request.getRecipientEmail(), request.getMessage()));
+    public ResponseEntity<ApiResponse> create(@Valid @RequestBody NotificationRequest request) {
+        return ResponseEntity.ok(notificationService.createNotification(request));
     }
 }

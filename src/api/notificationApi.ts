@@ -2,8 +2,11 @@ import { apiFetch } from './apiClient';
 
 export interface NotificationRecord {
   id: number;
-  recipientEmail: string;
+  userEmail: string;
+  recipientEmail?: string;
+  title: string;
   message: string;
+  type: string;
   read: boolean;
   createdAt: string;
 }
@@ -16,8 +19,10 @@ export interface NotificationStats {
 }
 
 export interface CreateNotificationPayload {
-  recipientEmail: string;
+  userEmail: string;
+  title: string;
   message: string;
+  type?: string;
 }
 
 export function getNotifications(email: string) {
@@ -38,9 +43,10 @@ export function getNotificationStats(email: string) {
   });
 }
 
-export function markNotificationAsRead(id: number) {
+export function markNotificationAsRead(id: number, email: string) {
   return apiFetch<NotificationRecord>(`/notifications/read/${id}`, {
     method: 'PUT',
+    query: { email },
   });
 }
 

@@ -1,26 +1,24 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import {
-  DashboardLayout,
-  SidebarItem,
-  UserProfile } from
-'../components/dashboard/DashboardLayout';
+import { DashboardLayout, SidebarItem } from '../components/dashboard/DashboardLayout';
+import { useDashboardProfile } from '../hooks/useDashboardProfile';
+
 interface PlaceholderPageProps {
   title: string;
   description: string;
   sidebarItems: SidebarItem[];
   sidebarLabel: string;
-  user: UserProfile;
   children?: React.ReactNode;
 }
+
 export function PlaceholderPage({
   title,
   description,
   sidebarItems,
   sidebarLabel,
-  user,
-  children
+  children,
 }: PlaceholderPageProps) {
+  const user = useDashboardProfile();
+
   return (
     <DashboardLayout
       sidebarItems={sidebarItems}
@@ -38,5 +36,4 @@ export function PlaceholderPage({
         {children}
       </div>
     </DashboardLayout>);
-
 }

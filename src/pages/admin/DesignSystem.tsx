@@ -9,16 +9,17 @@ import {
   BellIcon } from
 'lucide-react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import {
-  adminMenuItems,
-  adminUser } from
-'../../components/dashboard/adminConfig';
+import { adminMenuItems } from '../../components/dashboard/adminConfig';
+import { useDashboardProfile } from '../../hooks/useDashboardProfile';
+
 export function DesignSystem() {
+  const profile = useDashboardProfile();
+
   return (
     <DashboardLayout
       sidebarItems={adminMenuItems}
       sidebarLabel="Admin Menu"
-      user={adminUser}>
+      user={profile}>
       
       <div className="space-y-12 pb-12">
         {/* Header */}

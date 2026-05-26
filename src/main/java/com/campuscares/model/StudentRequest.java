@@ -12,13 +12,13 @@ public class StudentRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "student_name", nullable = false)
     private String studentName;
 
-    @Column(nullable = false)
+    @Column(name = "student_email", nullable = false)
     private String studentEmail;
 
-    @Column(nullable = false)
+    @Column(name = "requested_item_name", nullable = false)
     private String requestedItemName;
 
     @Column(nullable = false)
@@ -31,10 +31,10 @@ public class StudentRequest {
     @Column(nullable = false)
     private RequestStatus status;
 
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     @PrePersist
@@ -109,4 +109,3 @@ public class StudentRequest {
         return updatedAt;
     }
 }
-

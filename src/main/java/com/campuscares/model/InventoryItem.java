@@ -33,6 +33,9 @@ public class InventoryItem {
     @Column(name = "subject_or_course")
     private String subjectOrCourse;
 
+    @Column(name = "source_donation_id")
+    private Long sourceDonationId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -79,6 +82,9 @@ public class InventoryItem {
     }
 
     public void setQuantityAvailable(Integer quantityAvailable) {
+        if (quantityAvailable != null && quantityAvailable < 0) {
+            throw new IllegalArgumentException("Inventory quantity cannot be negative");
+        }
         this.quantityAvailable = quantityAvailable;
     }
 
@@ -104,6 +110,14 @@ public class InventoryItem {
 
     public void setSubjectOrCourse(String subjectOrCourse) {
         this.subjectOrCourse = subjectOrCourse;
+    }
+
+    public Long getSourceDonationId() {
+        return sourceDonationId;
+    }
+
+    public void setSourceDonationId(Long sourceDonationId) {
+        this.sourceDonationId = sourceDonationId;
     }
 
     public Instant getCreatedAt() {

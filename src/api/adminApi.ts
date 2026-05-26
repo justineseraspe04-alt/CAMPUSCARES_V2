@@ -1,5 +1,59 @@
 import { apiFetch } from './apiClient';
 
+export interface DashboardCategoryCount {
+  name: string;
+  count: number;
+  percent: number;
+}
+
+export interface DashboardDayCount {
+  name: string;
+  donations: number;
+}
+
+export interface DashboardLogSummary {
+  id: number;
+  action: string;
+  details: string;
+  performedBy: string;
+  createdAt: string;
+}
+
+export interface DashboardNotificationSummary {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface AdminDashboardStats {
+  totalDonations: number;
+  approvedDonations: number;
+  pendingDonations: number;
+  rejectedDonations: number;
+  totalInventoryItems: number;
+  lowStockItems: number;
+  pendingRequests: number;
+  approvedRequests: number;
+  rejectedRequests: number;
+  releasedRequests: number;
+  totalDistributedItems: number;
+  beneficiariesHelped: number;
+  unreadNotifications: number;
+  distributionProgressPercent: number;
+  donationActivityByDay: DashboardDayCount[];
+  requestCategoryBreakdown: DashboardCategoryCount[];
+  donationCategoryBreakdown: DashboardCategoryCount[];
+  recentLogs: DashboardLogSummary[];
+  recentNotifications: DashboardNotificationSummary[];
+  pendingDonationItems: DonationAdmin[];
+  pendingRequestItems: StudentRequestAdmin[];
+  inventoryPreview: InventoryAdmin[];
+}
+
+/** @deprecated Use AdminDashboardStats */
 export interface DashboardStats {
   totalDonations: number;
   totalDistributedItems: number;
@@ -80,12 +134,17 @@ export interface ReleaseDistributionPayload {
   itemName: string;
   quantityReleased: number;
   remarks?: string;
+  requestId?: number;
+}
+
+export function getAdminDashboardStats() {
+  return apiFetch<AdminDashboardStats>('/dashboard/admin', {
+    query: { role: 'ADMIN' },
+  });
 }
 
 export function getDashboardStats() {
-  return apiFetch<DashboardStats>('/dashboard/stats', {
-    query: { role: 'ADMIN' },
-  });
+  return getAdminDashboardStats();
 }
 
 export function getAllDonations() {

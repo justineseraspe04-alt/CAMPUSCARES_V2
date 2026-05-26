@@ -74,6 +74,7 @@ export function register(payload: RegisterPayload) {
     },
     credentials: 'include',
     body: JSON.stringify({
+      fullName: payload.fullName.trim(),
       email: payload.email.trim(),
       password: payload.password.trim(),
       role: payload.role.toUpperCase(),

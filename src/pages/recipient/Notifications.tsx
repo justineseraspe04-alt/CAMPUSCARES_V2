@@ -1,12 +1,15 @@
 import React from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import { recipientMenuItems, recipientUser } from '../../components/dashboard/recipientConfig';
+import { recipientMenuItems } from '../../components/dashboard/recipientConfig';
 import { NotificationPageContent } from '../../components/notifications/NotificationPageContent';
+import { useDashboardProfile } from '../../hooks/useDashboardProfile';
 
 export function Notifications() {
+  const profile = useDashboardProfile();
+
   return (
-    <DashboardLayout sidebarItems={recipientMenuItems} sidebarLabel="Recipient Menu" user={recipientUser}>
-      <NotificationPageContent user={recipientUser} accent="cyan" />
+    <DashboardLayout sidebarItems={recipientMenuItems} sidebarLabel="Recipient Menu" user={profile}>
+      <NotificationPageContent user={profile} accent="cyan" />
     </DashboardLayout>
   );
 }

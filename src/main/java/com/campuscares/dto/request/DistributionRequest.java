@@ -22,6 +22,9 @@ public class DistributionRequest {
 
     private String remarks;
 
+    /** When set, release is tied to an approved student request. */
+    private Long requestId;
+
     public String getRecipientName() {
         return recipientName;
     }
@@ -60,6 +63,14 @@ public class DistributionRequest {
 
     public void setRemarks(String remarks) {
         this.remarks = remarks;
+    }
+
+    public Long getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(Long requestId) {
+        this.requestId = requestId;
     }
 }
 

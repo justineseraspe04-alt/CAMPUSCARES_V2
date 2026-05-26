@@ -7,7 +7,7 @@ import {
   BellIcon,
   HomeIcon } from
 'lucide-react';
-import { SidebarItem, UserProfile } from './DashboardLayout';
+import { SidebarItem } from './DashboardLayout';
 
 export const recipientMenuItems: SidebarItem[] = [
 {
@@ -22,16 +22,6 @@ export const recipientMenuItems: SidebarItem[] = [
   name: 'AI Recommendations',
   href: '/recipient/recommendations',
   icon: SparklesIcon,
-  badge: 4
 },
 { name: 'Notifications', href: '/recipient/notifications', icon: BellIcon },
 { name: 'Home', href: '/', icon: HomeIcon }];
-
-
-export const recipientUser: UserProfile = {
-  name: 'Alex Rivera',
-  email: 'student@campuscares.com',
-  initials: 'AR',
-  roleLabel: 'Recipient',
-  accentColor: 'cyan'
-};

@@ -5,7 +5,7 @@ import {
   BellIcon,
   HomeIcon } from
 'lucide-react';
-import { SidebarItem, UserProfile } from './DashboardLayout';
+import { SidebarItem } from './DashboardLayout';
 
 export const donorMenuItems: SidebarItem[] = [
 { name: 'Dashboard', href: '/donor/dashboard', icon: LayoutDashboardIcon },
@@ -13,12 +13,3 @@ export const donorMenuItems: SidebarItem[] = [
 { name: 'Donation History', href: '/donor/history', icon: ClockIcon },
 { name: 'Notifications', href: '/donor/notifications', icon: BellIcon },
 { name: 'Home', href: '/', icon: HomeIcon }];
-
-
-export const donorUser: UserProfile = {
-  name: 'Jane Doe',
-  email: 'donor@campuscares.com',
-  initials: 'JD',
-  roleLabel: 'Donor',
-  accentColor: 'emerald'
-};

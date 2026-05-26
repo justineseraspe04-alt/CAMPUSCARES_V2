@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckSquareIcon,
@@ -12,10 +13,13 @@ import {
   CheckCircle2Icon,
 } from 'lucide-react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import { adminMenuItems, adminUser } from '../../components/dashboard/adminConfig';
+import { useDashboardProfile } from '../../hooks/useDashboardProfile';
+import { useAdminMenuItems } from '../../hooks/useAdminMenuItems';
 import {
   DistributionAdmin,
   DistributionStats,
+  StudentRequestAdmin,
+  getAllRequests,
   getDistributionStats,
   getDistributions,
   releaseDistribution,
@@ -25,15 +29,24 @@ import {
 
 type DateFilter = 'all' | 'today' | 'week';
 
+type DistributionsLocationState = {
+  openReleaseForRequestId?: number;
+};
+
 const emptyForm: ReleaseDistributionPayload = {
   recipientName: '',
   recipientEmail: '',
   itemName: '',
   quantityReleased: 1,
   remarks: '',
+  requestId: undefined,
 };
 
 export function Distributions() {
+  const profile = useDashboardProfile();
+  const menuItems = useAdminMenuItems();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [distributions, setDistributions] = useState<DistributionAdmin[]>([]);
   const [stats, setStats] = useState<DistributionStats>({
     totalDistributed: 0,
@@ -50,18 +63,21 @@ export function Distributions() {
   const [showReleaseModal, setShowReleaseModal] = useState(false);
   const [form, setForm] = useState<ReleaseDistributionPayload>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [approvedRequests, setApprovedRequests] = useState<StudentRequestAdmin[]>([]);
 
   const loadData = useCallback(async (keyword?: string) => {
     setLoading(true);
     setError('');
     try {
       const trimmed = (keyword ?? search).trim();
-      const [listResp, statsResp] = await Promise.all([
+      const [listResp, statsResp, requestsResp] = await Promise.all([
         trimmed ? searchDistributions(trimmed) : getDistributions(),
         getDistributionStats(),
+        getAllRequests(),
       ]);
       setDistributions(listResp.data ?? []);
       setStats(statsResp.data);
+      setApprovedRequests((requestsResp.data ?? []).filter((r) => r.status === 'APPROVED'));
     } catch (err) {
       setDistributions([]);
       setError(
@@ -102,11 +118,51 @@ export function Distributions() {
     });
   }, [dateFilter, distributions]);
 
+  const openReleaseForRequest = (request: StudentRequestAdmin) => {
+    setForm({
+      recipientName: request.studentName,
+      recipientEmail: request.studentEmail,
+      itemName: request.requestedItemName,
+      quantityReleased: 1,
+      remarks: `Release for request REQ-${request.id}`,
+      requestId: request.id,
+    });
+    setShowReleaseModal(true);
+  };
+
+  useEffect(() => {
+    const state = location.state as DistributionsLocationState | null;
+    const requestId = state?.openReleaseForRequestId;
+    if (!requestId || approvedRequests.length === 0) {
+      return;
+    }
+    const request = approvedRequests.find((entry) => entry.id === requestId);
+    if (request) {
+      openReleaseForRequest(request);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [approvedRequests, location.pathname, location.state, navigate]);
+
   const handleReleaseSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setSubmitting(true);
     setError('');
     setSuccessMessage('');
+
+    if (!form.requestId) {
+      setError('Select an approved request to release. Only approved requests can be released.');
+      return;
+    }
+    const releaseQty = form.quantityReleased;
+    if (!releaseQty || releaseQty <= 0) {
+      setError('Release quantity must be greater than 0.');
+      return;
+    }
+    if (!form.recipientName.trim() || !form.recipientEmail.trim() || !form.itemName.trim()) {
+      setError('Recipient and item details are required.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       await releaseDistribution({
         ...form,
@@ -135,7 +191,7 @@ export function Distributions() {
       .toUpperCase();
 
   return (
-    <DashboardLayout sidebarItems={adminMenuItems} sidebarLabel="Admin Menu" user={adminUser}>
+    <DashboardLayout sidebarItems={menuItems} sidebarLabel="Admin Menu" user={profile}>
       <div className="space-y-8 pb-12">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
@@ -184,8 +240,18 @@ export function Distributions() {
             </div>
             <button
               type="button"
-              onClick={() => setShowReleaseModal(true)}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition-colors shadow-sm"
+              onClick={() => {
+                setForm(emptyForm);
+                setError('');
+                setShowReleaseModal(true);
+              }}
+              disabled={approvedRequests.length === 0}
+              title={
+                approvedRequests.length === 0
+                  ? 'No approved requests available to release'
+                  : 'Release an approved request'
+              }
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <PlusIcon className="w-4 h-4" /> Release Item
             </button>
@@ -205,6 +271,46 @@ export function Distributions() {
               ? 'Failed to load distributions. Please check backend connection.'
               : error}
           </div>
+        )}
+
+        {approvedRequests.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-3xl border border-amber-200 shadow-sm overflow-hidden"
+          >
+            <div className="p-6 border-b border-amber-100 bg-amber-50/50">
+              <h2 className="text-lg font-bold text-slate-800">Approved Requests — Ready to Release</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Only approved requests can be released. Inventory decreases on release.
+              </p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {approvedRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50"
+                >
+                  <div>
+                    <p className="font-medium text-slate-800">
+                      {req.studentName} — {req.requestedItemName}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      REQ-{req.id} · {req.category} · {req.studentEmail}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => openReleaseForRequest(req)}
+                    className="shrink-0 px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 disabled:opacity-60"
+                  >
+                    Release Item
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -298,7 +404,7 @@ export function Distributions() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-            onClick={() => setShowReleaseModal(false)}
+            onClick={() => !submitting && setShowReleaseModal(false)}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -311,31 +417,64 @@ export function Distributions() {
                 <h2 className="text-xl font-bold text-slate-900">Release Item</h2>
                 <button
                   type="button"
+                  disabled={submitting}
                   onClick={() => setShowReleaseModal(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                  className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50"
                 >
                   <XIcon className="w-5 h-5" />
                 </button>
               </div>
               <form onSubmit={handleReleaseSubmit} className="space-y-4">
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Approved Request</label>
+                  <select
+                    required
+                    value={form.requestId ?? ''}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      const request = approvedRequests.find((entry) => entry.id === id);
+                      if (request) {
+                        openReleaseForRequest(request);
+                      } else {
+                        setForm(emptyForm);
+                      }
+                    }}
+                    disabled={submitting}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-700 disabled:opacity-60"
+                  >
+                    <option value="">Select approved request...</option>
+                    {approvedRequests.map((req) => (
+                      <option key={req.id} value={req.id}>
+                        REQ-{req.id} — {req.studentName} — {req.requestedItemName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {form.requestId && (
+                  <p className="text-xs font-medium text-sky-700 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+                    Linked to approved request REQ-{form.requestId}
+                  </p>
+                )}
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Recipient Name</label>
                   <input
                     required
+                    readOnly={Boolean(form.requestId)}
                     value={form.recipientName}
                     onChange={(e) => setForm({ ...form, recipientName: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
-                    placeholder="Alex Rivera"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 read-only:bg-slate-50 read-only:text-slate-600"
+                    placeholder="Recipient full name"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Recipient Email</label>
                   <input
                     required
+                    readOnly={Boolean(form.requestId)}
                     type="email"
                     value={form.recipientEmail}
                     onChange={(e) => setForm({ ...form, recipientEmail: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 read-only:bg-slate-50 read-only:text-slate-600"
                     placeholder="student@campuscares.com"
                   />
                 </div>
@@ -343,9 +482,10 @@ export function Distributions() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Item Name</label>
                   <input
                     required
+                    readOnly={Boolean(form.requestId)}
                     value={form.itemName}
                     onChange={(e) => setForm({ ...form, itemName: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 read-only:bg-slate-50 read-only:text-slate-600"
                     placeholder="Scientific Calculator"
                   />
                 </div>

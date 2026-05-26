@@ -1,12 +1,16 @@
 ﻿import React from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import { adminMenuItems, adminUser } from '../../components/dashboard/adminConfig';
+import { useAdminMenuItems } from '../../hooks/useAdminMenuItems';
 import { NotificationPageContent } from '../../components/notifications/NotificationPageContent';
+import { useDashboardProfile } from '../../hooks/useDashboardProfile';
 
 export function Notifications() {
+  const profile = useDashboardProfile();
+  const menuItems = useAdminMenuItems();
+
   return (
-    <DashboardLayout sidebarItems={adminMenuItems} sidebarLabel="Admin Menu" user={adminUser}>
-      <NotificationPageContent user={adminUser} accent="sky" />
+    <DashboardLayout sidebarItems={menuItems} sidebarLabel="Admin Menu" user={profile}>
+      <NotificationPageContent user={profile} accent="sky" />
     </DashboardLayout>
   );
 }

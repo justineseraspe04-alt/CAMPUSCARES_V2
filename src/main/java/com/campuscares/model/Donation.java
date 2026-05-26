@@ -12,39 +12,41 @@ public class Donation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "donor_name", nullable = false)
     private String donorName;
 
-    @Column(nullable = false)
+    @Column(name = "donor_email", nullable = false)
     private String donorEmail;
 
-    @Column(nullable = false)
+    @Column(name = "item_name", nullable = false)
     private String itemName;
 
     @Column(nullable = false)
     private String category;
 
-    @Column(nullable = false)
+    @Column(name = "item_condition", nullable = false)
     private String itemCondition;
 
     @Column(nullable = false)
     private Integer quantity;
 
-    @Column(nullable = false, length = 1200)
+    @Column(length = 1200)
     private String description;
 
+    @Column(name = "size")
     private String size;
 
+    @Column(name = "subject_or_course")
     private String subjectOrCourse;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DonationStatus status;
 
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     @PrePersist
@@ -151,4 +153,3 @@ public class Donation {
         return updatedAt;
     }
 }
-

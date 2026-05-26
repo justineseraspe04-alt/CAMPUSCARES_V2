@@ -26,8 +26,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public ApiResponse register(RegisterRequest request) {
-        String email = ValidationUtils.requireNonBlank(request.getEmail(), "email");
-        if (userRepository.existsByEmail(email)) {
+        String email = ValidationUtils.requireNonBlank(request.getEmail(), "email").trim().toLowerCase();
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             return ApiResponse.fail("Email is already registered.");
         }
 
@@ -72,7 +72,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         try {
-            User user = userRepository.findByEmail(emailInput).orElse(null);
+            String normalizedEmail = emailInput.trim().toLowerCase();
+            User user = userRepository.findByEmailIgnoreCase(normalizedEmail).orElse(null);
             if (user == null) {
                 return ApiResponse.fail("Invalid email, password, or role.");
             }

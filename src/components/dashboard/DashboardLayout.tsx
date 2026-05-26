@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getUnreadNotifications } from '../../api/notificationApi';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LogOutIcon,
   MenuIcon,
   XIcon,
-  SearchIcon,
   BellIcon,
   HeartHandshakeIcon,
-  CalendarIcon } from
-'lucide-react';
+  CalendarIcon,
+} from 'lucide-react';
+import { accentNavClasses } from '../../utils/tailwindClassMaps';
 export interface SidebarItem {
   name: string;
   href: string;
@@ -39,6 +40,13 @@ export function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -144,41 +152,45 @@ export function DashboardLayout({
           </div>
           {resolvedSidebarItems.map((item) => {
             const isActive =
-            location.pathname === item.href || location.hash === item.href;
+              location.pathname === item.href || location.hash === item.href;
+            const navAccent = accentNavClasses[user.accentColor] ?? accentNavClasses.sky;
             return (
               <Link
                 key={item.name}
                 to={item.href}
                 onClick={() => setIsSidebarOpen(false)}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors ${isActive ? `bg-${user.accentColor}-50 text-${user.accentColor}-700 font-medium` : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
-                
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors ${
+                  isActive ? `${navAccent.active} font-medium` : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}>
                 <div className="flex items-center gap-3 min-w-0">
                   <item.icon
-                    className={`w-5 h-5 shrink-0 ${isActive ? `text-${user.accentColor}-600` : 'text-slate-400'}`} />
-                  
+                    className={`w-5 h-5 shrink-0 ${isActive ? navAccent.icon : 'text-slate-400'}`}
+                  />
                   <span className="truncate">{item.name}</span>
                 </div>
-                {item.badge &&
-                <span
-                  className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${isActive ? `bg-${user.accentColor}-200 text-${user.accentColor}-800` : 'bg-slate-100 text-slate-600'}`}>
-                  
+                {item.badge && (
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                      isActive ? navAccent.badge : 'bg-slate-100 text-slate-600'
+                    }`}>
                     {item.badge}
                   </span>
-                }
-              </Link>);
-
+                )}
+              </Link>
+            );
           })}
         </nav>
 
         {/* User Area */}
         <div className="p-3 sm:p-4 border-t border-slate-100 shrink-0">
-          <Link
-            to="/login"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors">
             
             <LogOutIcon className="w-5 h-5 shrink-0" />
             <span className="font-medium">Logout</span>
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -195,15 +207,6 @@ export function DashboardLayout({
               <MenuIcon className="w-6 h-6" />
             </button>
 
-            {/* Search Bar — adaptive width */}
-            <div className="hidden sm:flex items-center relative flex-1 max-w-xs lg:max-w-sm">
-              <SearchIcon className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full pl-9 pr-4 py-2 bg-slate-100 border-transparent rounded-full text-sm focus:bg-white focus:border-sky-300 focus:ring-2 focus:ring-sky-100 transition-all min-w-0" />
-              
-            </div>
           </div>
 
           {/* Right Actions */}

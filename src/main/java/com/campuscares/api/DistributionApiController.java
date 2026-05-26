@@ -41,11 +41,9 @@ public class DistributionApiController {
 
     @PostMapping("/release")
     public ResponseEntity<ApiResponse> release(
-            @RequestParam(required = false) String role,
+            @RequestParam String role,
             @Valid @RequestBody DistributionRequest request) {
-        if (role != null && !role.isBlank()) {
-            authorizationUtil.requireAdmin(role);
-        }
+        authorizationUtil.requireAdmin(role);
         return ResponseEntity.ok(distributionService.releaseItem(request));
     }
 }

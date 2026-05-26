@@ -4,7 +4,9 @@ import com.campuscares.dto.request.DistributionRequest;
 import com.campuscares.dto.response.ApiResponse;
 import com.campuscares.dto.response.DistributionResponse;
 import com.campuscares.dto.response.DistributionStatsResponse;
+import com.campuscares.enums.ItemCategory;
 import com.campuscares.enums.RequestStatus;
+import com.campuscares.exception.InvalidOperationException;
 import com.campuscares.exception.ResourceNotFoundException;
 import com.campuscares.model.Distribution;
 import com.campuscares.model.InventoryItem;
@@ -16,7 +18,9 @@ import com.campuscares.repository.StudentRequestRepository;
 import com.campuscares.repository.TransactionLogRepository;
 import com.campuscares.service.DistributionService;
 import com.campuscares.service.NotificationService;
+import com.campuscares.util.CategoryUtil;
 import com.campuscares.util.NotificationConstants;
+import com.campuscares.util.NotificationTypes;
 import com.campuscares.util.ValidationUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -26,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DistributionServiceImpl implements DistributionService {
+    private static final String ADMIN_ACTOR = "admin@campuscares.com";
+
     private final InventoryItemRepository inventoryItemRepository;
     private final DistributionRepository distributionRepository;
     private final TransactionLogRepository transactionLogRepository;
@@ -49,7 +55,7 @@ public class DistributionServiceImpl implements DistributionService {
     public ApiResponse getAllDistributions() {
         return ApiResponse.ok(
                 "Distributions retrieved successfully.",
-                mapToResponses(distributionRepository.findAllByOrderByDistributedAtDesc()));
+                mapToResponses(distributionRepository.findAllByOrderByReleasedAtDesc()));
     }
 
     @Override
@@ -70,7 +76,7 @@ public class DistributionServiceImpl implements DistributionService {
     public ApiResponse searchDistributions(String keyword) {
         String safeKeyword = keyword == null ? "" : keyword.trim();
         List<Distribution> results = safeKeyword.isEmpty()
-                ? distributionRepository.findAllByOrderByDistributedAtDesc()
+                ? distributionRepository.findAllByOrderByReleasedAtDesc()
                 : distributionRepository.search(safeKeyword);
         return ApiResponse.ok("Distributions retrieved successfully.", mapToResponses(results));
     }
@@ -79,24 +85,35 @@ public class DistributionServiceImpl implements DistributionService {
     @Transactional
     public ApiResponse releaseItem(DistributionRequest request) {
         ValidationUtils.requirePositive(request.getQuantityReleased(), "quantityReleased");
-        String recipientName = ValidationUtils.requireNonBlank(request.getRecipientName(), "recipientName");
-        String recipientEmail = ValidationUtils.requireNonBlank(request.getRecipientEmail(), "recipientEmail");
-        String itemName = ValidationUtils.requireNonBlank(request.getItemName(), "itemName");
 
-        InventoryItem item = inventoryItemRepository
-                .findByItemNameIgnoreCaseOrderByQuantityAvailableDesc(itemName)
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Inventory item not found: " + itemName));
+        StudentRequest linkedRequest = resolveApprovedRequest(request);
+        String recipientName = linkedRequest != null
+                ? linkedRequest.getStudentName()
+                : ValidationUtils.requireNonBlank(request.getRecipientName(), "recipientName");
+        String recipientEmail = linkedRequest != null
+                ? linkedRequest.getStudentEmail()
+                : ValidationUtils.requireNonBlank(request.getRecipientEmail(), "recipientEmail");
+        String itemName = linkedRequest != null
+                ? linkedRequest.getRequestedItemName()
+                : ValidationUtils.requireNonBlank(request.getItemName(), "itemName");
+        ItemCategory category = linkedRequest != null
+                ? CategoryUtil.toItemCategory(linkedRequest.getCategory())
+                : null;
 
+        InventoryItem item = findInventoryForRelease(itemName, category);
         if (item.getQuantityAvailable() < request.getQuantityReleased()) {
-            throw new RuntimeException("Not enough inventory to release requested quantity.");
+            throw new InvalidOperationException(
+                    "Not enough inventory to release. Available: " + item.getQuantityAvailable()
+                            + ", requested: " + request.getQuantityReleased());
         }
 
         item.setQuantityAvailable(item.getQuantityAvailable() - request.getQuantityReleased());
         inventoryItemRepository.save(item);
 
         Distribution distribution = new Distribution();
+        if (linkedRequest != null) {
+            distribution.setRequestId(linkedRequest.getId());
+        }
         distribution.setRecipientName(recipientName);
         distribution.setRecipientEmail(recipientEmail);
         distribution.setItemName(item.getItemName());
@@ -104,25 +121,24 @@ public class DistributionServiceImpl implements DistributionService {
         distribution.setRemarks(request.getRemarks());
         Distribution savedDistribution = distributionRepository.save(distribution);
 
-        List<StudentRequest> approvedRequests = studentRequestRepository
-                .findByStudentEmailAndRequestedItemNameAndStatus(
-                        recipientEmail, item.getItemName(), RequestStatus.APPROVED);
-        if (!approvedRequests.isEmpty()) {
-            StudentRequest studentRequest = approvedRequests.get(0);
-            studentRequest.setStatus(RequestStatus.RELEASED);
-            studentRequestRepository.save(studentRequest);
+        if (linkedRequest != null) {
+            linkedRequest.setStatus(RequestStatus.RELEASED);
+            studentRequestRepository.save(linkedRequest);
         }
 
         TransactionLog log = new TransactionLog();
         log.setAction("ITEM_RELEASED");
-        log.setPerformedBy("admin");
+        log.setPerformedBy(ADMIN_ACTOR);
         log.setDetails("Released " + request.getQuantityReleased() + " " + item.getItemName()
-                + " to " + recipientName);
+                + " to " + recipientName
+                + (linkedRequest != null ? " (request #" + linkedRequest.getId() + ")" : ""));
         transactionLogRepository.save(log);
 
         notificationService.createNotification(
                 recipientEmail,
-                "Your item '" + item.getItemName() + "' has been released and is ready for pickup.");
+                "Item ready for pickup",
+                "Your item '" + item.getItemName() + "' has been released and is ready for pickup.",
+                NotificationTypes.ITEM_RELEASED);
 
         if (item.getQuantityAvailable() <= 5) {
             TransactionLog lowStockLog = new TransactionLog();
@@ -134,11 +150,64 @@ public class DistributionServiceImpl implements DistributionService {
 
             notificationService.createNotification(
                     NotificationConstants.ADMIN_EMAIL,
+                    "Low inventory warning",
                     "Low inventory alert: " + item.getItemName() + " has only "
-                            + item.getQuantityAvailable() + " item(s) left.");
+                            + item.getQuantityAvailable() + " item(s) left.",
+                    NotificationTypes.ADMIN_LOW_INVENTORY);
         }
 
         return ApiResponse.ok("Item released successfully.", toResponse(savedDistribution));
+    }
+
+    private StudentRequest resolveApprovedRequest(DistributionRequest request) {
+        if (request.getRequestId() != null) {
+            StudentRequest entity = studentRequestRepository.findById(request.getRequestId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Student request not found: " + request.getRequestId()));
+            if (entity.getStatus() != RequestStatus.APPROVED) {
+                throw new InvalidOperationException(
+                        "Only approved requests can be released. Current status: " + entity.getStatus());
+            }
+            return entity;
+        }
+
+        String recipientEmail = request.getRecipientEmail() == null ? "" : request.getRecipientEmail().trim();
+        String itemName = request.getItemName() == null ? "" : request.getItemName().trim();
+        if (recipientEmail.isEmpty() || itemName.isEmpty()) {
+            throw new InvalidOperationException(
+                    "Either requestId or both recipientEmail and itemName are required for release.");
+        }
+
+        List<StudentRequest> approved = studentRequestRepository
+                .findByStudentEmailAndRequestedItemNameAndStatus(
+                        recipientEmail, itemName, RequestStatus.APPROVED);
+        if (approved.isEmpty()) {
+            throw new InvalidOperationException(
+                    "No approved request found for " + recipientEmail + " and item \"" + itemName + "\".");
+        }
+        if (approved.size() > 1) {
+            throw new InvalidOperationException(
+                    "Multiple approved requests found. Please release using requestId.");
+        }
+        return approved.get(0);
+    }
+
+    private InventoryItem findInventoryForRelease(String itemName, ItemCategory category) {
+        List<InventoryItem> candidates = inventoryItemRepository
+                .findByItemNameIgnoreCaseOrderByQuantityAvailableDesc(itemName);
+
+        if (category != null) {
+            candidates = candidates.stream()
+                    .filter(i -> i.getCategory() == category)
+                    .toList();
+        }
+
+        return candidates.stream()
+                .filter(i -> i.getQuantityAvailable() > 0)
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No available inventory found for: " + itemName
+                                + (category != null ? " (" + category + ")" : "")));
     }
 
     private List<DistributionResponse> mapToResponses(List<Distribution> distributions) {
@@ -153,6 +222,6 @@ public class DistributionServiceImpl implements DistributionService {
                 distribution.getItemName(),
                 distribution.getQuantityReleased(),
                 distribution.getRemarks(),
-                distribution.getDistributedAt());
+                distribution.getReleasedAt());
     }
 }

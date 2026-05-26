@@ -10,6 +10,9 @@ public class Distribution {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "request_id")
+    private Long requestId;
+
     @Column(name = "recipient_name", nullable = false)
     private String recipientName;
 
@@ -26,17 +29,28 @@ public class Distribution {
     private String remarks;
 
     @Column(name = "distributed_at", nullable = false, updatable = false)
-    private Instant distributedAt;
+    private Instant releasedAt;
 
     @PrePersist
     void onCreate() {
-        if (distributedAt == null) {
-            distributedAt = Instant.now();
+        if (releasedAt == null) {
+            releasedAt = Instant.now();
+        }
+        if (quantityReleased != null && quantityReleased <= 0) {
+            throw new IllegalArgumentException("quantityReleased must be greater than zero");
         }
     }
 
     public Long getId() {
         return id;
+    }
+
+    public Long getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(Long requestId) {
+        this.requestId = requestId;
     }
 
     public String getRecipientName() {
@@ -79,7 +93,7 @@ public class Distribution {
         this.remarks = remarks;
     }
 
-    public Instant getDistributedAt() {
-        return distributedAt;
+    public Instant getReleasedAt() {
+        return releasedAt;
     }
 }

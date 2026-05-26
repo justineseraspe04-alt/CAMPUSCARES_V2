@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BoxesIcon, CheckCircle2Icon, AlertTriangleIcon, QrCodeIcon, SearchIcon, FilterIcon, XIcon } from 'lucide-react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import { adminMenuItems, adminUser } from '../../components/dashboard/adminConfig';
+import { useAdminMenuItems } from '../../hooks/useAdminMenuItems';
+import { useDashboardProfile } from '../../hooks/useDashboardProfile';
 import {
   getInventory,
   getInventoryByCategory,
@@ -38,6 +39,8 @@ function formatLabel(value: string) {
 }
 
 export function Inventory() {
+  const profile = useDashboardProfile();
+  const menuItems = useAdminMenuItems();
   const [inventory, setInventory] = useState<InventoryAdmin[]>([]);
   const [stats, setStats] = useState<InventoryStats>({
     totalItems: 0,
@@ -70,7 +73,13 @@ export function Inventory() {
         response = await getInventory();
       }
 
-      setInventory(response.data ?? []);
+      let list = response.data ?? [];
+      if (category && trimmedKeyword) {
+        list = list.filter(
+          (item) => item.category.toUpperCase() === category.toUpperCase()
+        );
+      }
+      setInventory(list);
       await loadStats();
     } catch (err) {
       setInventory([]);
@@ -99,7 +108,7 @@ export function Inventory() {
   };
 
   return (
-    <DashboardLayout sidebarItems={adminMenuItems} sidebarLabel="Admin Menu" user={adminUser}>
+    <DashboardLayout sidebarItems={menuItems} sidebarLabel="Admin Menu" user={profile}>
       <div className="space-y-8 pb-12">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
@@ -237,6 +246,11 @@ export function Inventory() {
                     </div>
                     <button
                       type="button"
+                      title="Copy item reference to clipboard"
+                      onClick={() => {
+                        const ref = item.qrCode || `INV-${item.id}`;
+                        void navigator.clipboard.writeText(ref);
+                      }}
                       className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-sm font-mono hover:bg-sky-50 hover:text-sky-700 hover:border-sky-200 transition-colors"
                     >
                       <QrCodeIcon className="w-4 h-4" /> {item.qrCode || `ID ${item.id}`}

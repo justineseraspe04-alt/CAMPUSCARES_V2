@@ -59,5 +59,10 @@ public class StudentRequestApiController {
     public ResponseEntity<ApiResponse> getAll() {
         return ResponseEntity.ok(studentRequestService.getAllRequests());
     }
+
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse> getRecipientStats(@RequestParam String studentEmail) {
+        return ResponseEntity.ok(studentRequestService.getRecipientStats(studentEmail));
+    }
 }
 

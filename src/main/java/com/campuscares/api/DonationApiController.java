@@ -51,6 +51,11 @@ public class DonationApiController {
         return ResponseEntity.ok(donationService.getDonationsByDonorEmail(donorEmail));
     }
 
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse> getDonorStats(@RequestParam String donorEmail) {
+        return ResponseEntity.ok(donationService.getDonorStats(donorEmail));
+    }
+
     @GetMapping("/pending")
     public ResponseEntity<ApiResponse> getPending(@RequestParam String role) {
         authorizationUtil.requireAdmin(role);
